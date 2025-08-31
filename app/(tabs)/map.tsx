@@ -1,5 +1,5 @@
 import * as Location from 'expo-location';
-import { collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
@@ -53,6 +53,22 @@ type RouteInfo = {
   distance: string;
   duration: string;
   isVisible: boolean;
+  isMinimized: boolean;
+};
+
+type FamilyNotification = {
+  id: string;
+  familyMemberId: string;
+  familyMemberName: string;
+  familyMemberEmail: string;
+  timestamp: Date;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+  distance: number;
+  message: string;
+  isRead: boolean;
 };
 
 const { width, height } = Dimensions.get('window');
@@ -118,8 +134,11 @@ export default function MapScreen() {
     coordinates: [],
     distance: '',
     duration: '',
-    isVisible: false
+    isVisible: false,
+    isMinimized: false
   });
+  const [familyNotifications, setFamilyNotifications] = useState<FamilyNotification[]>([]);
+
   const mapRef = useRef<MapView>(null);
 
   // Save or update current user's location in Firestore
@@ -229,13 +248,22 @@ export default function MapScreen() {
             return (a.distance || 0) - (b.distance || 0);
           });
           
-          setFamilyMembers(members);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching family members:', error);
-    }
-  };
+                     setFamilyMembers(members);
+           
+           // Check distances and create notifications for family members far away
+           if (location) {
+             for (const member of members) {
+               if (member.distance && member.distance >= 0.5) { // 500 meters or more
+                 await checkFamilyMemberDistance(member, location);
+               }
+             }
+           }
+         }
+       }
+     } catch (error) {
+       console.error('Error fetching family members:', error);
+     }
+   };
 
   // Fetch all users and their locations (both online and offline)
   const fetchAllUsers = async () => {
@@ -349,9 +377,9 @@ export default function MapScreen() {
       const origin = `${location.coords.latitude},${location.coords.longitude}`;
       const destination = `${destinationLat},${destinationLng}`;
       
-      // Using Google Maps Directions API
-      const apiKey = 'AIzaSyBIOC5weP0UHUucbi4EwAMAk-ollFzJ5nA'; // Your Google Maps API key
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${apiKey}`;
+      // Using Google Maps Directions API with optimized settings
+      const apiKey = 'AIzaSyBIOC5weP0UHUucbi4EwAMAk-ollFzJ5nA';
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&key=${apiKey}&optimize=true&avoid=highways&mode=driving`;
       
       const response = await fetch(url);
       const data = await response.json();
@@ -363,28 +391,54 @@ export default function MapScreen() {
         // Decode polyline to get coordinates
         const points = decodePolyline(route.overview_polyline.points);
         
+        console.log('🗺️ Route calculated successfully!');
+        console.log('📍 Start:', origin);
+        console.log('🎯 End:', destination);
+        console.log('📏 Distance:', leg.distance.text);
+        console.log('⏱️ Duration:', leg.duration.text);
+        console.log('🛣️ Route points:', points.length);
+        
         setRouteInfo({
           coordinates: points,
           distance: leg.distance.text,
           duration: leg.duration.text,
-          isVisible: true
+          isVisible: true,
+          isMinimized: false
         });
         
-        // Animate map to show the route
+        // Enhanced map animation to show the complete route
         if (mapRef.current && points.length > 0) {
+          // Calculate bounds to include the entire route
+          const lats = points.map(p => p.latitude);
+          const lngs = points.map(p => p.longitude);
+          const minLat = Math.min(...lats, location.coords.latitude);
+          const maxLat = Math.max(...lats, location.coords.latitude);
+          const minLng = Math.min(...lngs, location.coords.longitude);
+          const maxLng = Math.max(...lngs, location.coords.longitude);
+          
           const bounds = {
-            latitude: (location.coords.latitude + destinationLat) / 2,
-            longitude: (location.coords.longitude + destinationLng) / 2,
-            latitudeDelta: Math.abs(location.coords.latitude - destinationLat) * 1.5,
-            longitudeDelta: Math.abs(location.coords.longitude - destinationLng) * 1.5,
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLng + maxLng) / 2,
+            latitudeDelta: (maxLat - minLat) * 1.3,
+            longitudeDelta: (maxLng - minLng) * 1.3,
           };
           
-          mapRef.current.animateToRegion(bounds, 1000);
+          // Smooth animation to show the route
+          mapRef.current.animateToRegion(bounds, 1500);
+          
+          // Show success message
+          Alert.alert(
+            '🗺️ Route Found!',
+            `Shortest route: ${leg.distance.text} in ${leg.duration.text}\n\nFollow the highlighted orange path on the map!`,
+            [{ text: 'OK', style: 'default' }]
+          );
         }
+      } else {
+        Alert.alert('No Route Found', 'Could not find a route to the destination. Please try again.');
       }
     } catch (error) {
       console.error('Error calculating route:', error);
-      Alert.alert('Error', 'Could not calculate route. Please try again.');
+      Alert.alert('Error', 'Could not calculate route. Please check your internet connection and try again.');
     }
   };
 
@@ -420,6 +474,23 @@ export default function MapScreen() {
       });
     }
     return poly;
+  };
+
+  // Get turn-by-turn directions from Google Maps API response
+  const getTurnByTurnDirections = (leg: any): string[] => {
+    const directions: string[] = [];
+    if (leg.steps) {
+      leg.steps.forEach((step: any, index: number) => {
+        if (index === 0) {
+          directions.push(`🚗 Start from your location`);
+        }
+        directions.push(`${step.maneuver?.instruction || step.html_instructions?.replace(/<[^>]*>/g, '') || `Step ${index + 1}`}`);
+        if (index === leg.steps.length - 1) {
+          directions.push(`🎯 Arrive at destination`);
+        }
+      });
+    }
+    return directions;
   };
 
   // Calculate nearby users for a specific user
@@ -516,8 +587,21 @@ export default function MapScreen() {
   useEffect(() => {
     if (auth.currentUser) {
       fetchAllUsers();
+      
+      // Set up periodic check for family member distances (every 5 minutes)
+      const interval = setInterval(() => {
+        if (location && familyMembers.length > 0) {
+          familyMembers.forEach(member => {
+            if (member.distance && member.distance >= 0.5) {
+              checkFamilyMemberDistance(member, location);
+            }
+          });
+        }
+      }, 5 * 60 * 1000); // 5 minutes
+      
+      return () => clearInterval(interval);
     }
-  }, [auth.currentUser]);
+  }, [auth.currentUser, location, familyMembers]);
 
   // Periodically check online status (every 30 seconds)
   useEffect(() => {
@@ -703,9 +787,100 @@ export default function MapScreen() {
       coordinates: [],
       distance: '',
       duration: '',
-      isVisible: false
+      isVisible: false,
+      isMinimized: false
     });
   };
+
+  // Minimize route info
+  const minimizeRoute = () => {
+    setRouteInfo(prev => ({
+      ...prev,
+      isMinimized: true
+    }));
+  };
+
+  // Restore route info
+  const restoreRoute = () => {
+    setRouteInfo(prev => ({
+      ...prev,
+      isMinimized: false
+    }));
+  };
+
+  // Check family member distance and create notifications
+  const checkFamilyMemberDistance = async (familyMember: FamilyMember, currentLocation: UserLocation) => {
+    if (!familyMember.distance || familyMember.distance < 0.5) return; // Less than 500 meters
+    
+    try {
+      // Check if notification already exists for this family member in the last hour
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const existingNotification = familyNotifications.find(
+        n => n.familyMemberId === familyMember.id && 
+             new Date(n.timestamp) > oneHourAgo
+      );
+      
+      if (existingNotification) return; // Don't create duplicate notifications
+      
+      // Create notification for the family member
+      const notification: FamilyNotification = {
+        id: `${familyMember.id}-${Date.now()}`,
+        familyMemberId: familyMember.id,
+        familyMemberName: familyMember.name,
+        familyMemberEmail: familyMember.email,
+        timestamp: new Date(),
+        location: {
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude
+        },
+        distance: familyMember.distance,
+        message: `${familyMember.name} is at location and is ${familyMember.distance.toFixed(2)} km away from you`,
+        isRead: false
+      };
+
+      // Add notification to current user's notifications
+      if (auth.currentUser) {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, {
+          notifications: arrayUnion(notification)
+        });
+      }
+
+      // Add notification to family member's notifications
+      const familyMemberQuery = query(collection(db, 'users'), where('email', '==', familyMember.email));
+      const familyMemberSnapshot = await getDocs(familyMemberQuery);
+      if (!familyMemberSnapshot.empty) {
+        const familyMemberDoc = familyMemberSnapshot.docs[0];
+        const familyMemberNotification: FamilyNotification = {
+          ...notification,
+          id: `${auth.currentUser?.uid}-${Date.now()}`,
+          familyMemberId: auth.currentUser?.uid || '',
+          familyMemberName: 'You',
+          familyMemberEmail: auth.currentUser?.email || '',
+          message: `You are ${familyMember.distance.toFixed(2)} km away from ${familyMember.name}`,
+        };
+        
+        await updateDoc(doc(db, 'users', familyMemberDoc.id), {
+          notifications: arrayUnion(familyMemberNotification)
+        });
+      }
+
+      // Update local state
+      setFamilyNotifications(prev => [notification, ...prev]);
+      
+      // Show alert
+      Alert.alert(
+        '👨‍👩‍👧‍👦 Family Member Alert',
+        `${familyMember.name} is ${familyMember.distance.toFixed(2)} km away from you!`,
+        [{ text: 'OK', style: 'default' }]
+      );
+
+    } catch (error) {
+      console.error('Error creating family notification:', error);
+    }
+  };
+
+
 
   // Calculate region for the map
   const region: Region = location ? {
@@ -749,13 +924,13 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-             <View style={styles.userCountContainer}>
-         <Text style={styles.userCountText}>
+      <View style={styles.userCountContainer}>
+        <Text style={styles.userCountText}>
            👥 {userCounts.total} {userCounts.total === 1 ? 'person' : 'people'} total
-         </Text>
+        </Text>
          <Text style={styles.onlineUsersText}>
            🟢 {userCounts.online} online | 🔴 {userCounts.offline} offline
-         </Text>
+        </Text>
          <Text style={styles.locationStatusText}>
            📍 {allUsers.filter(u => u.isOnline).length} with live location | 📍 {allUsers.filter(u => !u.isOnline).length} with last known location
          </Text>
@@ -764,25 +939,78 @@ export default function MapScreen() {
              👨‍👩‍👧‍👦 {familyMembers.length} family members nearby
            </Text>
          )}
-         {allUsers.filter(u => u.isFamilyMember).length > 0 && (
-           <Text style={styles.familyMapText}>
-             🗺️ {allUsers.filter(u => u.isFamilyMember).length} family members on map
-           </Text>
-         )}
+                   {allUsers.filter(u => u.isFamilyMember).length > 0 && (
+            <Text style={styles.familyMapText}>
+              🗺️ {allUsers.filter(u => u.isFamilyMember).length} family members on map
+            </Text>
+          )}
+          
+
          
-         {/* Route Information */}
-         {routeInfo.isVisible && (
-           <View style={styles.routeInfoContainer}>
-             <Text style={styles.routeInfoTitle}>🗺️ Route to Family Member</Text>
-             <Text style={styles.routeInfoText}>
-               Distance: {routeInfo.distance} | Duration: {routeInfo.duration}
-             </Text>
-             <TouchableOpacity style={styles.clearRouteButton} onPress={clearRoute}>
-               <Text style={styles.clearRouteButtonText}>✕ Clear Route</Text>
-             </TouchableOpacity>
-           </View>
-         )}
-       </View>
+                   {/* Route Information - Enhanced */}
+          {routeInfo.isVisible && !routeInfo.isMinimized && (
+            <View style={styles.routeInfoContainer}>
+              <View style={styles.routeHeader}>
+                <Text style={styles.routeInfoTitle}>🗺️ Shortest Route</Text>
+                <View style={styles.routeHeaderButtons}>
+                  <TouchableOpacity style={styles.minimizeButton} onPress={minimizeRoute}>
+                    <Text style={styles.minimizeButtonText}>−</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.clearRouteButton} onPress={clearRoute}>
+                    <Text style={styles.clearRouteButtonText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              
+              <View style={styles.routeDetails}>
+                <View style={styles.routeDetailItem}>
+                  <Text style={styles.routeDetailLabel}>📍 Start:</Text>
+                  <Text style={styles.routeDetailValue}>Your Location</Text>
+                </View>
+                <View style={styles.routeDetailItem}>
+                  <Text style={styles.routeDetailLabel}>🎯 End:</Text>
+                  <Text style={styles.routeDetailValue}>Destination</Text>
+                </View>
+                <View style={styles.routeDetailItem}>
+                  <Text style={styles.routeDetailLabel}>📏 Distance:</Text>
+                  <Text style={styles.routeDetailValue}>{routeInfo.distance}</Text>
+                </View>
+                <View style={styles.routeDetailItem}>
+                  <Text style={styles.routeDetailLabel}>⏱️ Duration:</Text>
+                  <Text style={styles.routeDetailValue}>{routeInfo.duration}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.routeInstructions}>
+                <Text style={styles.routeInstructionsText}>
+                  🚗 Follow the highlighted orange route on the map
+                </Text>
+                <TouchableOpacity 
+                  style={styles.directionsButton}
+                  onPress={() => {
+                    Alert.alert(
+                      '🗺️ Navigation Instructions',
+                      'Follow the highlighted orange route on the map. The route shows the shortest path from your current location to the destination.',
+                      [{ text: 'Got it!', style: 'default' }]
+                    );
+                  }}
+                >
+                  <Text style={styles.directionsButtonText}>📋 Show Navigation Tips</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Minimized Route Icon */}
+          {routeInfo.isVisible && routeInfo.isMinimized && (
+            <TouchableOpacity 
+              style={styles.minimizedRouteIcon}
+              onPress={restoreRoute}
+            >
+              <Text style={styles.minimizedRouteIconText}>🗺️</Text>
+            </TouchableOpacity>
+          )}
+      </View>
 
       <MapView
         ref={mapRef}
@@ -828,13 +1056,13 @@ export default function MapScreen() {
 
                  {/* All other users' locations */}
          {allUsers.map((user) => (
-           <Marker
-             key={user.id}
-             coordinate={{
-               latitude: user.coords.latitude,
-               longitude: user.coords.longitude,
-             }}
-             title={user.name}
+          <Marker
+            key={user.id}
+            coordinate={{
+              latitude: user.coords.latitude,
+              longitude: user.coords.longitude,
+            }}
+            title={user.name}
              description={
                user.isFamilyMember ? 
                  `👨‍👩‍👧‍👦 Family Member (${user.isOnline ? 'Live' : 'Last Known'})` : 
@@ -848,15 +1076,45 @@ export default function MapScreen() {
            />
          ))}
 
-         {/* Route Polyline */}
-         {routeInfo.isVisible && routeInfo.coordinates.length > 0 && (
-           <Polyline
-             coordinates={routeInfo.coordinates}
-             strokeColor="#FF6B35"
-             strokeWidth={4}
-             lineDashPattern={[1]}
-           />
-         )}
+                   {/* Route Polyline - Enhanced for better visibility */}
+          {routeInfo.isVisible && routeInfo.coordinates.length > 0 && (
+            <>
+              {/* Main route line */}
+              <Polyline
+                coordinates={routeInfo.coordinates}
+                strokeColor="#FF6B35"
+                strokeWidth={6}
+                lineDashPattern={[1]}
+                zIndex={1000}
+              />
+              {/* Route border for better visibility */}
+              <Polyline
+                coordinates={routeInfo.coordinates}
+                strokeColor="#FFFFFF"
+                strokeWidth={8}
+                lineDashPattern={[1]}
+                zIndex={999}
+              />
+              
+              {/* Start Point Marker */}
+              <Marker
+                coordinate={routeInfo.coordinates[0]}
+                title="Start Point"
+                description="Your current location"
+                pinColor="#4CAF50"
+                zIndex={1001}
+              />
+              
+              {/* End Point Marker */}
+              <Marker
+                coordinate={routeInfo.coordinates[routeInfo.coordinates.length - 1]}
+                title="Destination"
+                description="Route destination"
+                pinColor="#FF6B35"
+                zIndex={1001}
+              />
+            </>
+          )}
        </MapView>
 
       {/* User Details Modal */}
@@ -878,7 +1136,7 @@ export default function MapScreen() {
               >
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
-            </View>
+              </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {selectedUser && (
@@ -963,24 +1221,39 @@ export default function MapScreen() {
                     </View>
                   )}
                   
-                  {/* Route Button for Family Members */}
-                  {selectedUser.isFamilyMember && location && (
-                    <View style={styles.infoSection}>
-                      <TouchableOpacity
-                        style={styles.routeButton}
-                        onPress={() => {
-                          console.log('Calculating route to family member from modal:', selectedUser.name);
-                          calculateRoute(
-                            selectedUser.coords.latitude,
-                            selectedUser.coords.longitude
-                          );
-                          setShowUserModal(false); // Close modal to show route
-                        }}
-                      >
-                        <Text style={styles.routeButtonText}>🗺️ Show Route to {selectedUser.name}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
+                                     {/* Route Button for All Users */}
+                   {location && (
+                     <View style={styles.infoSection}>
+                       <TouchableOpacity
+                         style={[
+                           styles.routeButton,
+                           selectedUser.isFamilyMember && styles.familyRouteButton
+                         ]}
+                         onPress={() => {
+                           console.log('Calculating route to user from modal:', selectedUser.name);
+                           calculateRoute(
+                             selectedUser.coords.latitude,
+                             selectedUser.coords.longitude
+                           );
+                           setShowUserModal(false); // Close modal to show route
+                         }}
+                       >
+                         <Text style={styles.routeButtonText}>
+                           🗺️ Show Route to {selectedUser.name}
+                         </Text>
+                       </TouchableOpacity>
+                       
+                       {/* Additional route info for testing */}
+                       <View style={styles.routeTestInfo}>
+                         <Text style={styles.routeTestText}>
+                           📍 From: Your Location ({location.coords.latitude.toFixed(4)}, {location.coords.longitude.toFixed(4)})
+                         </Text>
+                         <Text style={styles.routeTestText}>
+                           🎯 To: {selectedUser.name} ({selectedUser.coords.latitude.toFixed(4)}, {selectedUser.coords.longitude.toFixed(4)})
+                         </Text>
+                       </View>
+                     </View>
+                   )}
 
                   {/* Nearby Users Section */}
                   {nearbyUsers.length > 0 && (
@@ -1449,18 +1722,76 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 120,
     alignSelf: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderRadius: 20,
     zIndex: 1,
-    elevation: 3,
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    minWidth: 250,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    minWidth: 280,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FF6B35',
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 12,
+  },
+  routeDetails: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  routeDetailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  routeDetailLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '600',
+  },
+  routeDetailValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  routeInstructions: {
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+  },
+  routeInstructionsText: {
+    fontSize: 12,
+    color: '#FF6B35',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  directionsButton: {
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  directionsButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   routeInfoTitle: {
     fontSize: 16,
@@ -1497,5 +1828,72 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+
+
+
+
+
+
+  familyRouteButton: {
+    backgroundColor: '#FF8C00', // Different color for family members
+    borderWidth: 2,
+    borderColor: '#FF6B35',
+  },
+  routeTestInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  routeTestText: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 4,
+    fontFamily: 'monospace',
+  },
+
+  routeHeaderButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  minimizeButton: {
+    backgroundColor: '#FFA726',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  minimizeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  minimizedRouteIcon: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    backgroundColor: '#FF6B35',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  minimizedRouteIconText: {
+    fontSize: 20,
+    color: 'white',
   },
 });
