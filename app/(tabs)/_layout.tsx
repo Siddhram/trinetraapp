@@ -49,7 +49,7 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="trinetra"
+        name="trinetra-webview"
         options={{
           title: 'Trinetra',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="globe" color={color} />,

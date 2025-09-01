@@ -5,13 +5,13 @@ import { getFirestore } from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBqENK2EK8JgtUbBbNGHU-TCFNdjHZUH-0",
-  authDomain: "trinetra-2ecaa.firebaseapp.com",
-  projectId: "trinetra-2ecaa",
-  storageBucket: "trinetra-2ecaa.firebasestorage.app",
-  messagingSenderId: "329716671351",
-  appId: "1:329716671351:web:4f48342a764be63274b772",
-  measurementId: "G-6Q82M88QYW"
+  apiKey: "AIzaSyBDFani8FVoBi3_LdeOn4TKSLApCus0zuI",
+  authDomain: "trinetra-12e7c.firebaseapp.com",
+  projectId: "trinetra-12e7c",
+  storageBucket: "trinetra-12e7c.firebasestorage.app",
+  messagingSenderId: "904671937646",
+  appId: "1:904671937646:web:3025486ecea88f8dd8527f",
+  measurementId: "G-D7X0Z9S54Y"
 };
 
 // Initialize Firebase

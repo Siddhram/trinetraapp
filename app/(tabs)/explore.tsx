@@ -2,6 +2,7 @@ import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../lib/firebase';
+import NotificationService from '../../lib/notificationService';
 
 type FamilyNotification = {
   id: string;
@@ -41,7 +42,13 @@ export default function TabTwoScreen() {
         }
       });
       
-      return () => unsubscribe();
+      // Setup notification listeners for this tab
+      const notificationListeners = NotificationService.setupNotificationListeners();
+      
+      return () => {
+        unsubscribe();
+        NotificationService.removeNotificationListeners(notificationListeners);
+      };
     }
   }, [auth.currentUser]);
 

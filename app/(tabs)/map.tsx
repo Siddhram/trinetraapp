@@ -1,9 +1,12 @@
 import * as Location from 'expo-location';
 import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import React, { useEffect, useRef, useState } from 'react';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { auth, db } from '../../lib/firebase';
+import NotificationService from '../../lib/notificationService';
 
 type UserLocation = {
   id: string;
@@ -19,6 +22,7 @@ type UserLocation = {
   timestamp: number;
   name: string;
   color: string;
+
   userData?: any; // Full user data
   isOnline?: boolean; // Whether user is currently online
   lastSeen?: string; // Last seen timestamp
@@ -36,6 +40,15 @@ type FamilyMember = {
   imageUrl?: string;
   distance?: number;
   lastSeen?: string;
+  defaultLocation?: {
+    latitude: number;
+    longitude: number;
+    altitude: number | null;
+    accuracy: number | null;
+    altitudeAccuracy: number | null;
+    heading: number | null;
+    speed: number | null;
+  };
 };
 
 type NearbyUser = {
@@ -71,6 +84,21 @@ type FamilyNotification = {
   isRead: boolean;
 };
 
+type DistanceAlert = {
+  id: string;
+  familyMemberId: string;
+  familyMemberName: string;
+  familyMemberEmail: string;
+  isActive: boolean;
+  startTime: Date;
+  lastAlertTime: Date;
+  distance: number;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+};
+
 const { width, height } = Dimensions.get('window');
 
 // Default location (Mumbai, India)
@@ -88,6 +116,7 @@ const USER_COLORS = [
   '#FF9800', // Orange
   '#E91E63', // Pink
 ];
+
 
 // Calculate distance between two coordinates in kilometers
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -122,11 +151,13 @@ const isUserOnline = (timestamp: any): boolean => {
 
 export default function MapScreen() {
   const [location, setLocation] = useState<UserLocation | null>(null);
+
   const [allUsers, setAllUsers] = useState<UserLocation[]>([]);
   const [nearbyUsers, setNearbyUsers] = useState<NearbyUser[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [isTracking, setIsTracking] = useState(true);
+
   const [selectedUser, setSelectedUser] = useState<UserLocation | null>(null);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -138,8 +169,44 @@ export default function MapScreen() {
     isMinimized: false
   });
   const [familyNotifications, setFamilyNotifications] = useState<FamilyNotification[]>([]);
+  const [distanceAlerts, setDistanceAlerts] = useState<DistanceAlert[]>([]);
+  const [mobileNotification, setMobileNotification] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'success' | 'info';
+  } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
 
   const mapRef = useRef<MapView>(null);
+
+  // Setup notifications on component mount
+  useEffect(() => {
+    let notificationListeners: { notificationListener: any; responseListener: any } | null = null;
+
+    const setupNotifications = async () => {
+      try {
+        // Register for notifications
+        await NotificationService.registerForPushNotifications();
+        
+        // Setup notification listeners
+        notificationListeners = NotificationService.setupNotificationListeners();
+        
+        console.log('✅ Notifications setup completed');
+      } catch (error) {
+        console.error('Error setting up notifications:', error);
+      }
+    };
+
+    setupNotifications();
+
+    // Cleanup on unmount
+    return () => {
+      if (notificationListeners) {
+        NotificationService.removeNotificationListeners(notificationListeners);
+      }
+    };
+  }, []);
 
   // Save or update current user's location in Firestore
   const updateUserLocation = async (locationData: Location.LocationObject) => {
@@ -157,12 +224,14 @@ export default function MapScreen() {
       },
       timestamp: serverTimestamp(),
       name: 'User ' + auth.currentUser.uid.slice(0, 6),
+
       updatedAt: serverTimestamp(),
       lastSeen: serverTimestamp()
     };
 
     try {
       await setDoc(doc(db, 'users', auth.currentUser.uid),
+
         { 
           location: userLocation,
           lastLocation: userLocation, // Also update last known location
@@ -174,6 +243,7 @@ export default function MapScreen() {
       console.error('Error updating user location:', error);
     }
   };
+
 
   // Fetch user's family members and calculate distances
   const fetchFamilyMembers = async (userId: string) => {
@@ -198,7 +268,7 @@ export default function MapScreen() {
               const hasLastLocation = memberData.lastLocation && memberData.lastLocation.coords;
               const hasAnyLocation = hasCurrentLocation || hasLastLocation;
               
-              if (hasAnyLocation && location) {
+              if (hasAnyLocation && location && location.coords) {
                 // Use current location if available, otherwise use last known location
                 const locationToUse = hasCurrentLocation ? memberData.location : memberData.lastLocation;
                 const isCurrentlyOnline = hasCurrentLocation && isUserOnline(memberData.location.timestamp);
@@ -211,31 +281,49 @@ export default function MapScreen() {
                   locationToUse.coords.longitude
                 );
                 
-                members.push({
-                  id: doc.id,
-                  name: memberData.name || 'Unknown',
-                  email: memberData.email,
-                  role: memberData.role || 'user',
-                  phone: memberData.phone || 'N/A',
-                  aadhaar: memberData.aadhaar || 'N/A',
-                  imageUrl: memberData.imageUrl,
-                  distance: Math.round(distance * 100) / 100, // Round to 2 decimal places
-                  lastSeen: memberData.lastSeen?.toDate?.()?.toLocaleString() || 
-                           locationToUse.timestamp?.toDate?.()?.toLocaleString() || 'Unknown'
-                });
+                if (distance !== null && distance !== undefined && !isNaN(distance)) {
+                  members.push({
+                    id: doc.id,
+                    name: memberData.name || 'Unknown',
+                    email: memberData.email,
+                    role: memberData.role || 'user',
+                    phone: memberData.phone || 'N/A',
+                    aadhaar: memberData.aadhaar || 'N/A',
+                    imageUrl: memberData.imageUrl,
+                    distance: Math.round(distance * 100) / 100, // Round to 2 decimal places
+                    lastSeen: memberData.lastSeen?.toDate?.()?.toLocaleString() || 
+                             locationToUse.timestamp?.toDate?.()?.toLocaleString() || 'Unknown'
+                  });
+                }
               } else {
                 // Family member has no location data at all (completely offline)
-                members.push({
-                  id: doc.id,
-                  name: memberData.name || 'Unknown',
-                  email: memberData.email,
-                  role: memberData.role || 'user',
-                  phone: memberData.phone || 'N/A',
-                  aadhaar: memberData.aadhaar || 'N/A',
-                  imageUrl: memberData.imageUrl,
-                  distance: undefined, // No distance for completely offline members
-                  lastSeen: memberData.lastSeen?.toDate?.()?.toLocaleString() || 'Never'
-                });
+                if (memberData.name && memberData.email) {
+                  // Even if no location, add them to the map with a default location
+                  // This ensures all family members are visible
+                  const defaultLocation = {
+                    latitude: location ? location.coords.latitude + (Math.random() - 0.5) * 0.01 : 19.0760,
+                    longitude: location ? location.coords.longitude + (Math.random() - 0.5) * 0.01 : 72.8777,
+                    altitude: null,
+                    accuracy: 1000,
+                    altitudeAccuracy: null,
+                    heading: null,
+                    speed: null,
+                  };
+                  
+                  members.push({
+                    id: doc.id,
+                    name: memberData.name || 'Unknown',
+                    email: memberData.email,
+                    role: memberData.role || 'user',
+                    phone: memberData.phone || 'N/A',
+                    aadhaar: memberData.aadhaar || 'N/A',
+                    imageUrl: memberData.imageUrl,
+                    distance: undefined, // No distance for completely offline members
+                    lastSeen: memberData.lastSeen?.toDate?.()?.toLocaleString() || 'Never',
+                    // Add default location for map display
+                    defaultLocation: defaultLocation
+                  });
+                }
               }
             });
           }
@@ -249,15 +337,52 @@ export default function MapScreen() {
           });
           
                      setFamilyMembers(members);
-           
-           // Check distances and create notifications for family members far away
-           if (location) {
-             for (const member of members) {
-               if (member.distance && member.distance >= 0.5) { // 500 meters or more
-                 await checkFamilyMemberDistance(member, location);
-               }
-             }
-           }
+          
+          // Automatically add all family members to the map (allUsers array)
+          // This ensures family members are always visible on the map
+          const familyMembersForMap: UserLocation[] = members.map(member => {
+            if (member.defaultLocation) {
+              // Family member has no real location, use default location
+              return {
+                id: member.id,
+                coords: member.defaultLocation,
+                timestamp: Date.now(),
+                name: member.name,
+                color: '#FF6B35', // Orange for family members
+                userData: {
+                  email: member.email,
+                  role: member.role,
+                  phone: member.phone,
+                  aadhaar: member.aadhaar,
+                  name: member.name,
+                  imageUrl: member.imageUrl
+                },
+                isOnline: false,
+                lastSeen: member.lastSeen || 'No Location Data',
+                isFamilyMember: true
+              };
+            } else if (member.distance !== undefined) {
+              // Family member has real location data
+              // Find their location from the allUsers array or create a marker
+              const existingUser = allUsers.find(u => u.id === member.id);
+              if (existingUser) {
+                return existingUser;
+              } else {
+                // Create a UserLocation object for the family member
+                // This will be handled by the fetchAllUsers function
+                return null;
+              }
+            }
+            return null;
+          }).filter(Boolean) as UserLocation[];
+          
+                    // Update allUsers to include family members
+          setAllUsers(prevUsers => {
+            const nonFamilyUsers = prevUsers.filter(u => !u.isFamilyMember);
+            return [...nonFamilyUsers, ...familyMembersForMap];
+          });
+          
+                  // No automatic analysis - only when user clicks on "You" marker
          }
        }
      } catch (error) {
@@ -266,7 +391,7 @@ export default function MapScreen() {
    };
 
   // Fetch all users and their locations (both online and offline)
-  const fetchAllUsers = async () => {
+  const fetchAllUsers = async (): Promise<UserLocation[]> => {
     try {
       console.log('Fetching all users from database...');
       const usersRef = collection(db, 'users');
@@ -278,6 +403,7 @@ export default function MapScreen() {
       const usersData: UserLocation[] = [];
       let colorIndex = 0;
 
+
       // First, get current user's family members to check against
       let currentUserFamilyMembers: string[] = [];
       if (auth.currentUser) {
@@ -286,6 +412,7 @@ export default function MapScreen() {
           if (currentUserDoc.exists()) {
             const currentUserData = currentUserDoc.data();
             currentUserFamilyMembers = currentUserData.familyMembers || [];
+            console.log('Current user family members:', currentUserFamilyMembers);
           }
         } catch (error) {
           console.log('Error getting current user family members:', error);
@@ -294,9 +421,11 @@ export default function MapScreen() {
 
       for (const doc of querySnapshot.docs) {
         // Skip the current user's document
+
         if (doc.id === auth.currentUser?.uid) continue;
 
         const userData = doc.data();
+
         console.log('Processing user:', doc.id, userData.email, userData.name);
         
         // Check if user has any location data (current location OR last known location)
@@ -331,6 +460,7 @@ export default function MapScreen() {
           
           usersData.push({
             id: doc.id,
+
             coords: coords,
             timestamp: timestamp?.toDate?.()?.getTime() || Date.now(),
             name: userData.name || userData.email.split('@')[0] || 'User ' + (colorIndex + 1),
@@ -342,8 +472,40 @@ export default function MapScreen() {
             isFamilyMember: isFamilyMember
           });
           colorIndex++;
+
         } else if (userData.email) {
-          console.log('User has no location data:', userData.email, 'Skipping...');
+          // Even if user has no location data, add them to the map if they are family members
+          const isFamilyMember = currentUserFamilyMembers.includes(userData.email);
+          
+          if (isFamilyMember) {
+            console.log('Adding family member without location data:', userData.email, userData.name);
+            
+            // Create a default location near the current user or use a fallback
+            const defaultCoords = {
+              latitude: location ? location.coords.latitude + (Math.random() - 0.5) * 0.01 : 19.0760,
+              longitude: location ? location.coords.longitude + (Math.random() - 0.5) * 0.01 : 72.8777,
+              altitude: null,
+              accuracy: 1000,
+              altitudeAccuracy: null,
+              heading: null,
+              speed: null,
+            };
+            
+            usersData.push({
+              id: doc.id,
+              coords: defaultCoords,
+              timestamp: Date.now(),
+              name: userData.name || userData.email.split('@')[0] || 'Unknown Family Member',
+              color: '#FF6B35', // Orange for family members
+              userData: userData,
+              isOnline: false,
+              lastSeen: 'No Location Data',
+              isFamilyMember: true
+            });
+            colorIndex++;
+          } else {
+            console.log('User has no location data:', userData.email, 'Skipping...');
+          }
         }
       }
 
@@ -364,8 +526,11 @@ export default function MapScreen() {
       if (selectedUser && location) {
         calculateNearbyUsers(selectedUser, usersData);
       }
+      
+      return usersData;
     } catch (error) {
       console.error('Error fetching all users:', error);
+      return [];
     }
   };
 
@@ -581,6 +746,7 @@ export default function MapScreen() {
     });
 
     return () => unsubscribe();
+
   }, [auth.currentUser?.uid, allUsers, selectedUser]);
 
   // Initial fetch of all users
@@ -588,18 +754,18 @@ export default function MapScreen() {
     if (auth.currentUser) {
       fetchAllUsers();
       
-      // Set up periodic check for family member distances (every 5 minutes)
-      const interval = setInterval(() => {
-        if (location && familyMembers.length > 0) {
-          familyMembers.forEach(member => {
-            if (member.distance && member.distance >= 0.5) {
-              checkFamilyMemberDistance(member, location);
-            }
-          });
-        }
-      }, 5 * 60 * 1000); // 5 minutes
+      // No automatic distance monitoring - only manual analysis when clicking "You"
       
-      return () => clearInterval(interval);
+      // Set up periodic refresh of family members (every 2 minutes)
+      const familyRefreshInterval = setInterval(() => {
+        if (auth.currentUser) {
+          fetchFamilyMembers(auth.currentUser.uid);
+        }
+      }, 2 * 60 * 1000); // 2 minutes
+      
+      return () => {
+        clearInterval(familyRefreshInterval);
+      };
     }
   }, [auth.currentUser, location, familyMembers]);
 
@@ -661,6 +827,7 @@ export default function MapScreen() {
         },
         timestamp: position.timestamp,
         name: 'You',
+
         color: '#0000FF', // Blue for current user
         isOnline: true,
         lastSeen: 'Now'
@@ -669,8 +836,16 @@ export default function MapScreen() {
       // Save user location to Firestore
       if (auth.currentUser) {
         await updateUserLocation(position);
-        // Fetch family members after updating location
-        await fetchFamilyMembers(auth.currentUser.uid);
+
+          // Fetch family members after updating location
+          await fetchFamilyMembers(auth.currentUser.uid);
+          // Also fetch all users to ensure family members are on the map
+          await fetchAllUsers();
+          
+          // Check for existing distance alerts after location and family members are loaded
+          if (familyMembers && familyMembers.length > 0) {
+            await checkExistingDistanceAlerts();
+          }
       }
 
       return userLocation;
@@ -696,7 +871,8 @@ export default function MapScreen() {
         subscription = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.High,
-            timeInterval: 10000,
+
+            timeInterval: 20000,
             distanceInterval: 10,
           },
           (newLocation) => {
@@ -742,6 +918,7 @@ export default function MapScreen() {
             },
             timestamp: Date.now(),
             name: 'Default Location',
+
             color: '#808080',
             isOnline: false,
             lastSeen: 'Unknown'
@@ -761,17 +938,31 @@ export default function MapScreen() {
     };
   }, []);
 
+
   // Handle marker press
   const handleMarkerPress = (user: UserLocation) => {
     setSelectedUser(user);
     setShowUserModal(true);
     
     // Calculate nearby users for this user
-    calculateNearbyUsers(user, allUsers);
+    // Ensure allUsers is populated before calculating
+    if (allUsers.length > 0) {
+      calculateNearbyUsers(user, allUsers);
+    } else {
+      // If allUsers is empty, fetch users first then calculate
+      fetchAllUsers().then((usersData) => {
+        // Use the returned data directly instead of relying on state update
+        calculateNearbyUsers(user, usersData);
+      });
+    }
     
-    // If this is the current user, fetch family members
+    // If this is the current user, analyze family members and send notifications
     if (user.name === 'You' && auth.currentUser) {
       fetchFamilyMembers(auth.currentUser.uid);
+      // Trigger family member analysis and send notifications to explore tab
+      setTimeout(() => {
+        analyzeFamilyMembersAndSendNotifications();
+      }, 1000); // Small delay to ensure family members are loaded
     }
     
     // If this is a family member, show route option
@@ -808,23 +999,104 @@ export default function MapScreen() {
     }));
   };
 
-  // Check family member distance and create notifications
+  // Check family member distance and create notifications (DEPRECATED - use manageDistanceAlerts instead)
   const checkFamilyMemberDistance = async (familyMember: FamilyMember, currentLocation: UserLocation) => {
-    if (!familyMember.distance || familyMember.distance < 0.5) return; // Less than 500 meters
+    // This function is deprecated and should not be used
+    // Use manageDistanceAlerts instead for proper distance monitoring
+    console.log('checkFamilyMemberDistance is deprecated - use manageDistanceAlerts instead');
+    return;
+  };
+
+  // Manage distance alerts for family members (only on state changes)
+  const manageDistanceAlerts = async (familyMember: FamilyMember, currentLocation: UserLocation) => {
+    if (!familyMember.distance) return;
+    
+    const isFarAway = familyMember.distance >= 0.5; // 500 meters or more
+    const existingAlert = distanceAlerts.find(alert => alert.familyMemberId === familyMember.id);
     
     try {
-      // Check if notification already exists for this family member in the last hour
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      const existingNotification = familyNotifications.find(
-        n => n.familyMemberId === familyMember.id && 
-             new Date(n.timestamp) > oneHourAgo
-      );
+      if (isFarAway) {
+        // Family member is far away - only start alert if not already active
+        if (!existingAlert) {
+          // Start new alert (ONLY ONCE when they first go far away)
+          const newAlert: DistanceAlert = {
+            id: `${familyMember.id}-alert`,
+            familyMemberId: familyMember.id,
+            familyMemberName: familyMember.name,
+            familyMemberEmail: familyMember.email,
+            isActive: true,
+            startTime: new Date(),
+            lastAlertTime: new Date(),
+            distance: familyMember.distance,
+            location: {
+              latitude: currentLocation.coords.latitude,
+              longitude: currentLocation.coords.longitude
+            }
+          };
+          
+          setDistanceAlerts(prev => [...prev, newAlert]);
+          
+          // Send initial alert (ONLY ONCE)
+          await sendDistanceAlert(familyMember, currentLocation);
+          
+        } else if (existingAlert.isActive) {
+          // Just update the distance, but DON'T send repeated alerts
+          const updatedAlert = {
+            ...existingAlert,
+            distance: familyMember.distance
+          };
+          
+          setDistanceAlerts(prev => 
+            prev.map(alert => 
+              alert.id === existingAlert.id ? updatedAlert : alert
+            )
+          );
+          
+          // NO REPEATED ALERTS - just update the distance silently
+        }
+      } else {
+        // Family member is within range - stop alert if active
+        if (existingAlert && existingAlert.isActive) {
+          // Stop the alert
+          setDistanceAlerts(prev => {
+            const updatedAlerts = prev.map(alert => 
+              alert.id === existingAlert.id 
+                ? { ...alert, isActive: false }
+                : alert
+            );
+            
+            // Check if all alerts are now inactive
+            const hasActiveAlerts = updatedAlerts.some(alert => alert.isActive);
+            // No need to stop countdown timer since we removed it
+            
+            return updatedAlerts;
+          });
+          
+          // Send "back in range" notification (ONLY ONCE when they come back)
+          await sendBackInRangeNotification(familyMember, currentLocation);
+        }
+      }
+    } catch (error) {
+      console.error('Error managing distance alerts:', error);
+    }
+  };
+
+  // Send distance alert notification
+  const sendDistanceAlert = async (familyMember: FamilyMember, currentLocation: UserLocation) => {
+    if (!familyMember.distance) return; // Skip if no distance data
+    
+    try {
+      const currentTime = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+      const alertMessage = `🚨 ${familyMember.name} is ${familyMember.distance.toFixed(2)} km away from you at ${currentTime}!`;
       
-      if (existingNotification) return; // Don't create duplicate notifications
-      
-      // Create notification for the family member
+      // Create notification for current user
       const notification: FamilyNotification = {
-        id: `${familyMember.id}-${Date.now()}`,
+        id: `${familyMember.id}-distance-alert-${Date.now()}`,
         familyMemberId: familyMember.id,
         familyMemberName: familyMember.name,
         familyMemberEmail: familyMember.email,
@@ -834,11 +1106,11 @@ export default function MapScreen() {
           longitude: currentLocation.coords.longitude
         },
         distance: familyMember.distance,
-        message: `${familyMember.name} is at location and is ${familyMember.distance.toFixed(2)} km away from you`,
+        message: alertMessage,
         isRead: false
       };
 
-      // Add notification to current user's notifications
+      // Add to current user's notifications
       if (auth.currentUser) {
         const userRef = doc(db, 'users', auth.currentUser.uid);
         await updateDoc(userRef, {
@@ -846,18 +1118,18 @@ export default function MapScreen() {
         });
       }
 
-      // Add notification to family member's notifications
+      // Add to family member's notifications
       const familyMemberQuery = query(collection(db, 'users'), where('email', '==', familyMember.email));
       const familyMemberSnapshot = await getDocs(familyMemberQuery);
       if (!familyMemberSnapshot.empty) {
         const familyMemberDoc = familyMemberSnapshot.docs[0];
         const familyMemberNotification: FamilyNotification = {
           ...notification,
-          id: `${auth.currentUser?.uid}-${Date.now()}`,
+          id: `${auth.currentUser?.uid}-distance-alert-${Date.now()}`,
           familyMemberId: auth.currentUser?.uid || '',
           familyMemberName: 'You',
           familyMemberEmail: auth.currentUser?.email || '',
-          message: `You are ${familyMember.distance.toFixed(2)} km away from ${familyMember.name}`,
+          message: `🚨 You are ${familyMember.distance.toFixed(2)} km away from ${familyMember.name} at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}`,
         };
         
         await updateDoc(doc(db, 'users', familyMemberDoc.id), {
@@ -868,15 +1140,329 @@ export default function MapScreen() {
       // Update local state
       setFamilyNotifications(prev => [notification, ...prev]);
       
-      // Show alert
+      // Send Expo mobile notification
+      try {
+        await NotificationService.sendFamilyAlertNotification({
+          familyMemberName: familyMember.name,
+          familyMemberId: familyMember.id,
+          distance: familyMember.distance,
+          timestamp: currentTime,
+          location: {
+            latitude: currentLocation.coords.latitude,
+            longitude: currentLocation.coords.longitude
+          }
+        });
+        console.log(`📱 Sent mobile push notification for ${familyMember.name} (${familyMember.distance.toFixed(2)} km away)`);
+      } catch (notificationError) {
+        console.error('Error sending mobile notification:', notificationError);
+      }
+
+      // Show in-app mobile notification banner
+      showMobileNotification(
+        '🚨 Family Member Distance Alert',
+        alertMessage,
+        'alert'
+      );
+
+    } catch (error) {
+      console.error('Error sending distance alert:', error);
+    }
+  };
+
+  // Send "back in range" notification
+  const sendBackInRangeNotification = async (familyMember: FamilyMember, currentLocation: UserLocation) => {
+    if (!familyMember.distance) return; // Skip if no distance data
+    
+    try {
+      const currentTime = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+      const backInRangeMessage = `✅ ${familyMember.name} is back within range at ${currentTime}!`;
+      
+      // Create notification for current user
+      const notification: FamilyNotification = {
+        id: `${familyMember.id}-back-in-range-${Date.now()}`,
+        familyMemberId: familyMember.id,
+        familyMemberName: familyMember.name,
+        familyMemberEmail: familyMember.email,
+        timestamp: new Date(),
+        location: {
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude
+        },
+        distance: familyMember.distance,
+        message: backInRangeMessage,
+        isRead: false
+      };
+
+      // Add to current user's notifications
+      if (auth.currentUser) {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await updateDoc(userRef, {
+          notifications: arrayUnion(notification)
+        });
+      }
+
+      // Add to family member's notifications
+      const familyMemberQuery = query(collection(db, 'users'), where('email', '==', familyMember.email));
+      const familyMemberSnapshot = await getDocs(familyMemberQuery);
+      if (!familyMemberSnapshot.empty) {
+        const familyMemberDoc = familyMemberSnapshot.docs[0];
+        const familyMemberNotification: FamilyNotification = {
+          ...notification,
+          id: `${auth.currentUser?.uid}-back-in-range-${Date.now()}`,
+          familyMemberId: auth.currentUser?.uid || '',
+          familyMemberName: 'You',
+          familyMemberEmail: auth.currentUser?.email || '',
+          message: `✅ You are back within range of ${familyMember.name} at ${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}`,
+        };
+        
+        await updateDoc(doc(db, 'users', familyMemberDoc.id), {
+          notifications: arrayUnion(familyMemberNotification)
+        });
+      }
+
+      // Update local state
+      setFamilyNotifications(prev => [notification, ...prev]);
+      
+      // Send Expo mobile notification for family member coming back
+      try {
+        await NotificationService.sendFamilyNearbyNotification(familyMember.name);
+        console.log(`📱 Sent mobile notification: ${familyMember.name} is back within range`);
+      } catch (notificationError) {
+        console.error('Error sending nearby notification:', notificationError);
+      }
+
+      // Show in-app mobile notification banner
+      showMobileNotification(
+        '✅ Family Member Back in Range',
+        backInRangeMessage,
+        'success'
+      );
+
+    } catch (error) {
+      console.error('Error sending back in range notification:', error);
+    }
+  };
+
+  // Check for existing distance alerts when app starts (ONCE ONLY)
+  const checkExistingDistanceAlerts = async () => {
+    if (!location || !familyMembers || familyMembers.length === 0) return;
+    
+    // Use a flag to ensure this only runs once per session
+    const hasCheckedAlerts = await AsyncStorage.getItem('hasCheckedInitialAlerts');
+    if (hasCheckedAlerts === 'true') return;
+    
+    try {
+      const currentTime = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+      
+      // Check each family member for existing distance alerts
+      for (const member of familyMembers) {
+        if (member && member.distance && member.distance >= 0.5) {
+          // Family member is already far away - create immediate alert (ONCE ONLY)
+          const newAlert: DistanceAlert = {
+            id: `${member.id}-alert`,
+            familyMemberId: member.id,
+            familyMemberName: member.name,
+            familyMemberEmail: member.email,
+            isActive: true,
+            startTime: new Date(),
+            lastAlertTime: new Date(),
+            distance: member.distance,
+            location: {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude
+            }
+          };
+          
+          setDistanceAlerts(prev => [...prev, newAlert]);
+          
+          // Send mobile notification for existing distance (ONCE ONLY)
+          const alertMessage = `🚨 ${member.name} is already ${member.distance.toFixed(2)} km away from you at ${currentTime}!`;
+          
+          // Send Expo mobile notification for existing far away family member
+          try {
+            await NotificationService.sendFamilyAlertNotification({
+              familyMemberName: member.name,
+              familyMemberId: member.id,
+              distance: member.distance,
+              timestamp: currentTime,
+              location: {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude
+              }
+            });
+            console.log(`📱 Sent mobile notification for existing alert: ${member.name} (${member.distance.toFixed(2)} km away)`);
+          } catch (notificationError) {
+            console.error('Error sending existing alert notification:', notificationError);
+          }
+          
+          showMobileNotification(
+            '🚨 Family Member Already Far Away',
+            alertMessage,
+            'alert'
+          );
+          
+
+        }
+      }
+      
+      // Mark that we've checked initial alerts for this session
+      await AsyncStorage.setItem('hasCheckedInitialAlerts', 'true');
+    } catch (error) {
+      console.error('Error checking existing distance alerts:', error);
+    }
+  };
+
+
+
+  // Show mobile notification (simulates push notification)
+  const showMobileNotification = (title: string, message: string, type: 'alert' | 'success' | 'info') => {
+    setMobileNotification({
+      visible: true,
+      title,
+      message,
+      type
+    });
+
+    // Auto-hide notification after 5 seconds
+    setTimeout(() => {
+      setMobileNotification(null);
+    }, 5000);
+  };
+
+  // Clear initial alert flag when user logs out (call this from logout function)
+  const clearInitialAlertFlag = async () => {
+    try {
+      await AsyncStorage.removeItem('hasCheckedInitialAlerts');
+    } catch (error) {
+      console.error('Error clearing initial alert flag:', error);
+    }
+  };
+
+  // Analyze family members and send notifications to explore tab (triggered by clicking "You")
+  const analyzeFamilyMembersAndSendNotifications = async () => {
+    // Prevent multiple simultaneous analyses
+    if (isAnalyzing) {
+      console.log('Analysis already in progress, skipping...');
+      return;
+    }
+
+    if (!location || !familyMembers || familyMembers.length === 0) {
+      console.log('No family members to analyze');
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      console.log('🔍 Analyzing family members...');
+      console.log('📊 Total family members to analyze:', familyMembers.length);
+      
+      const currentTime = new Date().toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: true 
+      });
+
+      let farAwayCount = 0;
+      let nearbyCount = 0;
+      let offlineCount = 0;
+
+      // Check each family member and send notifications to explore tab ONLY for those far away
+      for (const member of familyMembers) {
+        if (member) {
+          // Check if family member has distance data (online with location)
+          if (member.distance !== undefined && member.distance !== null) {
+            console.log(`📍 Analyzing ${member.name}: distance = ${member.distance} km`);
+            const isFarAway = member.distance >= 0.5; // 500 meters or more
+            
+            if (isFarAway) {
+              farAwayCount++;
+              console.log(`🚨 ${member.name} is far away (${member.distance} km) - SENDING ALERT`);
+              // Family member is far away - send notification to explore tab
+              const notification: FamilyNotification = {
+                id: `${member.id}-far-away-${Date.now()}`,
+                familyMemberId: member.id,
+                familyMemberName: member.name,
+                familyMemberEmail: member.email,
+                timestamp: new Date(),
+                location: {
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude
+                },
+                distance: member.distance,
+                message: `🚨 ALERT: ${member.name} is ${member.distance.toFixed(2)} km away from you at ${currentTime}!`,
+                isRead: false
+              };
+
+              // Add notification to current user's notifications in Firestore
+              if (auth.currentUser) {
+                const userRef = doc(db, 'users', auth.currentUser.uid);
+                await updateDoc(userRef, {
+                  notifications: arrayUnion(notification)
+                });
+              }
+
+              // Send mobile push notification
+              try {
+                await NotificationService.sendFamilyAlertNotification({
+                  familyMemberName: member.name,
+                  familyMemberId: member.id,
+                  distance: member.distance,
+                  timestamp: currentTime,
+                  location: {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                  }
+                });
+                console.log(`📱 Sent mobile notification for ${member.name} (${member.distance.toFixed(2)} km away)`);
+              } catch (notificationError) {
+                console.error('Error sending mobile notification:', notificationError);
+              }
+
+              console.log(`📱 Sent ALERT notification for ${member.name} (${member.distance.toFixed(2)} km away)`);
+            } else {
+              nearbyCount++;
+              console.log(`✅ ${member.name} is nearby (${member.distance} km) - NO ALERT NEEDED`);
+              // Family member is nearby - NO notification sent (only count for summary)
+            }
+          } else {
+            // Family member has no location data (offline)
+            offlineCount++;
+            console.log(`📱 ${member.name} is offline (no location data) - NO ALERT NEEDED`);
+            // Offline members - NO notification sent (only count for summary)
+          }
+        }
+      }
+
+      // Show success message with summary
+      const summaryMessage = `Analyzed ${familyMembers.length} family members:\n\n🚨 ${farAwayCount} far away (>500m) - ALERTS SENT\n✅ ${nearbyCount} nearby (<500m) - No alerts\n📱 ${offlineCount} offline - No alerts\n\nCheck the Explore tab for ALERT notifications!`;
+
       Alert.alert(
-        '👨‍👩‍👧‍👦 Family Member Alert',
-        `${familyMember.name} is ${familyMember.distance.toFixed(2)} km away from you!`,
+        '🔍 Family Analysis Complete',
+        summaryMessage,
         [{ text: 'OK', style: 'default' }]
       );
 
     } catch (error) {
-      console.error('Error creating family notification:', error);
+      console.error('Error analyzing family members:', error);
+      Alert.alert(
+        'Error',
+        'Failed to analyze family members. Please try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -897,16 +1483,16 @@ export default function MapScreen() {
 
   // Get accurate user counts
   const getAccurateUserCounts = () => {
-    const totalWithLocation = 1 + allUsers.length; // Including current user
-    const onlineWithLiveLocation = allUsers.filter(user => user.isOnline).length;
-    const offlineWithLastLocation = allUsers.filter(user => !user.isOnline).length;
-    const familyMembersOnMap = allUsers.filter(user => user.isFamilyMember).length;
+    const totalWithLocation = 1 + (allUsers ? allUsers.length : 0); // Including current user
+    const onlineWithLiveLocation = allUsers ? allUsers.filter(user => user.isOnline).length : 0;
+    const offlineWithLastLocation = allUsers ? allUsers.filter(user => !user.isOnline).length : 0;
+    const familyMembersOnMap = allUsers ? allUsers.filter(user => user.isFamilyMember).length : 0;
     
     return {
-      total: totalWithLocation,
-      online: onlineWithLiveLocation,
-      offline: offlineWithLastLocation,
-      familyOnMap: familyMembersOnMap
+      total: totalWithLocation || 0,
+      online: onlineWithLiveLocation || 0,
+      offline: offlineWithLastLocation || 0,
+      familyOnMap: familyMembersOnMap || 0
     };
   };
 
@@ -924,26 +1510,62 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
+
+      
+      {/* Mobile Notification Banner */}
+      {mobileNotification && (
+        <View style={[
+          styles.mobileNotificationContainer,
+          mobileNotification.type === 'alert' ? styles.mobileNotificationAlert :
+          mobileNotification.type === 'success' ? styles.mobileNotificationSuccess :
+          styles.mobileNotificationInfo
+        ]}>
+          <View style={styles.mobileNotificationContent}>
+            <Text style={styles.mobileNotificationTitle}>
+              {mobileNotification.title}
+            </Text>
+            <Text style={styles.mobileNotificationMessage}>
+              {mobileNotification.message}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.mobileNotificationClose}
+            onPress={() => setMobileNotification(null)}
+          >
+            <Text style={styles.mobileNotificationCloseText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
       <View style={styles.userCountContainer}>
         <Text style={styles.userCountText}>
+
            👥 {userCounts.total} {userCounts.total === 1 ? 'person' : 'people'} total
         </Text>
+
          <Text style={styles.onlineUsersText}>
            🟢 {userCounts.online} online | 🔴 {userCounts.offline} offline
         </Text>
+
          <Text style={styles.locationStatusText}>
-           📍 {allUsers.filter(u => u.isOnline).length} with live location | 📍 {allUsers.filter(u => !u.isOnline).length} with last known location
+           📍 {allUsers ? allUsers.filter(u => u.isOnline).length : 0} with live location | 📍 {allUsers ? allUsers.filter(u => !u.isOnline).length : 0} with last known location
          </Text>
-         {familyMembers.length > 0 && (
+         {familyMembers && familyMembers.length > 0 && (
            <Text style={styles.familyCountText}>
              👨‍👩‍👧‍👦 {familyMembers.length} family members nearby
            </Text>
          )}
-                   {allUsers.filter(u => u.isFamilyMember).length > 0 && (
-            <Text style={styles.familyMapText}>
-              🗺️ {allUsers.filter(u => u.isFamilyMember).length} family members on map
-            </Text>
-          )}
+         {allUsers && allUsers.filter(u => u.isFamilyMember).length > 0 && (
+           <Text style={styles.familyMapText}>
+             🗺️ {allUsers.filter(u => u.isFamilyMember).length} family members on map
+           </Text>
+         )}
+         <Text style={styles.autoFamilyText}>
+           👨‍👩‍👧‍👦 Family members automatically displayed
+         </Text>
+         <Text style={styles.manualAnalysisText}>
+           💡 Click on "You" marker to analyze family members and send ALERTS to Explore tab for those {'>'}500m away
+         </Text>
           
 
          
@@ -1050,6 +1672,7 @@ export default function MapScreen() {
             title="You"
             description="Your current location"
             pinColor={location.color}
+
             onPress={() => handleMarkerPress(location)}
           />
         )}
@@ -1063,11 +1686,12 @@ export default function MapScreen() {
               longitude: user.coords.longitude,
             }}
             title={user.name}
-             description={
-               user.isFamilyMember ? 
-                 `👨‍👩‍👧‍👦 Family Member (${user.isOnline ? 'Live' : 'Last Known'})` : 
-                 `${user.isOnline ? '🟢 Live Location' : '🔴 Last Known Location'}`
-             }
+
+                         description={
+              user.isFamilyMember 
+                ? (user.isOnline ? '👨‍👩‍👧‍👦 Family Member (Live)' : '👨‍👩‍👧‍👦 Family Member (Last Known)')
+                : (user.isOnline ? '🟢 Live Location' : '🔴 Last Known Location')
+            }
              pinColor={
                user.isFamilyMember ? '#FF6B35' : // Orange for family members
                (user.isOnline ? user.color : '#808080') // Original color or gray for offline
@@ -1137,6 +1761,7 @@ export default function MapScreen() {
                 <Text style={styles.closeButtonText}>✕</Text>
               </TouchableOpacity>
               </View>
+
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {selectedUser && (
@@ -1242,6 +1867,8 @@ export default function MapScreen() {
                            🗺️ Show Route to {selectedUser.name}
                          </Text>
                        </TouchableOpacity>
+                       
+
                        
                        {/* Additional route info for testing */}
                        <View style={styles.routeTestInfo}>
@@ -1406,8 +2033,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 20,
     alignSelf: 'center',
+
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingHorizontal: 16,
+
     paddingVertical: 12,
     borderRadius: 20,
     zIndex: 1,
@@ -1416,6 +2045,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
+
     minWidth: 200,
   },
   userCountText: {
@@ -1425,10 +2055,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
+
   onlineUsersText: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+
     marginBottom: 4,
   },
   locationStatusText: {
@@ -1449,6 +2081,108 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '600',
   },
+  autoFamilyText: {
+    fontSize: 10,
+    color: '#FF8C00',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginBottom: 4,
+  },
+  distanceAlertText: {
+    fontSize: 12,
+    color: '#FF0000',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    marginBottom: 4,
+    backgroundColor: '#FFEBEE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  manualAnalysisText: {
+    fontSize: 12,
+    color: '#FF6B35',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 4,
+    backgroundColor: '#FFF3E0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    fontStyle: 'italic',
+  },
+  countdownContainer: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    right: 20,
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  countdownText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  // Mobile Notification Styles
+  mobileNotificationContainer: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    right: 20,
+    borderRadius: 12,
+    zIndex: 1000,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  mobileNotificationAlert: {
+    backgroundColor: '#FF6B35',
+  },
+  mobileNotificationSuccess: {
+    backgroundColor: '#4CAF50',
+  },
+  mobileNotificationInfo: {
+    backgroundColor: '#2196F3',
+  },
+  mobileNotificationContent: {
+    flex: 1,
+  },
+  mobileNotificationTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  mobileNotificationMessage: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  mobileNotificationClose: {
+    marginLeft: 12,
+    padding: 4,
+  },
+  mobileNotificationCloseText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   // Modal Styles
   modalOverlay: {
     flex: 1,
@@ -1458,6 +2192,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
+
     borderRadius: 20,
     width: '90%',
     maxHeight: '80%',
@@ -1493,8 +2228,10 @@ const styles = StyleSheet.create({
   },
   closeButtonText: {
     fontSize: 16,
+
     color: '#666',
     fontWeight: 'bold',
+
   },
   modalBody: {
     padding: 20,
@@ -1531,6 +2268,7 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
+
   userRole: {
     fontSize: 16,
     color: '#666',
@@ -1840,6 +2578,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#FF6B35',
   },
+  analysisButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginTop: 8,
+    borderWidth: 2,
+    borderColor: '#45A049',
+  },
+  analysisButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   routeTestInfo: {
     backgroundColor: '#f8f9fa',
     padding: 12,
@@ -1896,4 +2649,42 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: 'white',
   },
+  
+  // Test User Management Styles
+  testUserContainer: {
+    backgroundColor: '#FFF3E0',
+    padding: 16,
+    marginHorizontal: 20,
+    marginVertical: 12,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#FFB74D',
+  },
+  testUserTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#E65100',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  testUserButton: {
+    backgroundColor: '#FF8C00',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    marginBottom: 8,
+    minWidth: 200,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  testUserButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
 });
+
