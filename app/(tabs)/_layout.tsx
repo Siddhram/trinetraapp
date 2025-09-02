@@ -49,6 +49,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="medical"
+        options={{
+          title: 'Medical',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="cross.case" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="my-requests"
+        options={{
+          title: 'My Requests',
+          tabBarIcon: ({ color }) => <IconSymbol size={28} name="list.bullet" color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="trinetra-webview"
         options={{
           title: 'Trinetra',

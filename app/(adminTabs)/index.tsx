@@ -1,7 +1,6 @@
 
-import React from 'react';
-import { View, Text, StyleSheet, Button } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Button, StyleSheet, Text, View } from 'react-native';
 
 export default function CCTVScreen() {
   const router = useRouter();

@@ -2,7 +2,7 @@ import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, query, setDoc, where } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../lib/firebase';
 
@@ -111,7 +111,7 @@ export default function RegisterScreen() {
         location: null,
         lastLocation: null,
         lastSeen: timestamp,
-        relationship: role === 'admin' ? 'Admin' : 'User',
+        relationship: role === 'admin' ? 'Admin' : role === 'medicalAdmin' ? 'Medical Admin' : 'User',
         registrationTimestamp: timestamp.toISOString()
       };
       
@@ -326,7 +326,8 @@ export default function RegisterScreen() {
             >
               <Picker.Item label="User" value="user" />
               <Picker.Item label="Admin" value="admin" />
-                <Picker.Item label="Global Admin" value="Globaladmin" />
+              <Picker.Item label="Medical Admin" value="medicalAdmin" />
+              <Picker.Item label="Global Admin" value="Globaladmin" />
             </Picker>
           </View>
           </View>

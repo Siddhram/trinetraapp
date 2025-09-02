@@ -97,8 +97,44 @@ export default function TabTwoScreen() {
       
       await updateDoc(userRef, { notifications: updatedNotifications });
       setFamilyNotifications(updatedNotifications);
+      console.log(`🗑️ Cleared notification: ${notificationId}`);
     } catch (error) {
       console.error('Error clearing notification:', error);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    try {
+      const userRef = doc(db, 'users', auth.currentUser!.uid);
+      
+      // Clear all notifications from Firestore collection
+      await updateDoc(userRef, { notifications: [] });
+      
+      // Clear local state
+      setFamilyNotifications([]);
+      
+      // Also clear any distance alerts that might exist in the user's data
+      // This ensures complete cleanup of all alert-related data
+      await updateDoc(userRef, { 
+        notifications: [],
+        distanceAlerts: [] // Clear distance alerts if they exist
+      });
+      
+      console.log('🗑️ Cleared ALL notifications and distance alerts from Firestore collection');
+      
+      // Show success message
+      Alert.alert(
+        'Success', 
+        'All notifications and alerts have been completely cleared from the database!',
+        [{ text: 'OK', style: 'default' }]
+      );
+    } catch (error) {
+      console.error('Error clearing all notifications:', error);
+      Alert.alert(
+        'Error', 
+        'Failed to clear notifications. Please try again.',
+        [{ text: 'OK', style: 'default' }]
+      );
     }
   };
 
@@ -257,11 +293,7 @@ export default function TabTwoScreen() {
                   { 
                     text: 'Clear All', 
                     style: 'destructive',
-                    onPress: () => {
-                      familyNotifications.forEach(notification => {
-                        clearNotification(notification.id);
-                      });
-                    }
+                    onPress: clearAllNotifications
                   }
                 ]
               );

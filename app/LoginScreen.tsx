@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../lib/firebase';
 
@@ -28,7 +28,11 @@ export default function LoginScreen() {
       // Fetch user role from Firestore
       const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
       const userData = userDoc.exists() ? userDoc.data() : {};
-      if (userData.role === 'admin') {
+      
+      // Navigate based on user role
+      if (userData.role === 'medicalAdmin') {
+        router.push('/(medicalAdminTabs)');
+      } else if (userData.role === 'admin') {
         router.push('/(adminTabs)');
       } else {
         router.push('/(tabs)');

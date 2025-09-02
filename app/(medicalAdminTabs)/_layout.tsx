@@ -1,11 +1,12 @@
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import TabBarBackground from '../../components/ui/TabBarBackground';
-export default function AdminTabLayout() {
+
+export default function MedicalAdminTabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#FFA500',
+        tabBarActiveTintColor: '#FF6B6B',
         headerShown: false,
         tabBarBackground: TabBarBackground,
         tabBarStyle: Platform.select({
@@ -13,11 +14,11 @@ export default function AdminTabLayout() {
           default: {},
         }),
       }}>
-      <Tabs.Screen name="index" options={{ title: 'CCTV' }} />
-      <Tabs.Screen name="alerts" options={{ title: 'Alerts' }} />
-      <Tabs.Screen name="missing" options={{ title: 'Missing' }} />
-      <Tabs.Screen name="disaster" options={{ title: 'Disaster' }} />
+      <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
+      <Tabs.Screen name="ambulance-requests" options={{ title: 'Ambulance Requests' }} />
+      <Tabs.Screen name="users-coming" options={{ title: 'Users Coming' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>
   );
 }
+

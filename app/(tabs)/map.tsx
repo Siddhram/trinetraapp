@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { arrayUnion, collection, doc, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Alert, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -180,7 +180,7 @@ export default function MapScreen() {
 
   const mapRef = useRef<MapView>(null);
 
-  // Setup notifications on component mount
+  // Setup notifications and fetch family members on component mount
   useEffect(() => {
     let notificationListeners: { notificationListener: any; responseListener: any } | null = null;
 
@@ -198,7 +198,20 @@ export default function MapScreen() {
       }
     };
 
+    const setupInitialData = async () => {
+      try {
+        // Fetch family members immediately when component mounts
+        if (auth.currentUser) {
+          console.log('🚀 Initial fetch of family members...');
+          await fetchFamilyMembers(auth.currentUser.uid);
+        }
+      } catch (error) {
+        console.error('Error in initial setup:', error);
+      }
+    };
+
     setupNotifications();
+    setupInitialData();
 
     // Cleanup on unmount
     return () => {
@@ -206,7 +219,21 @@ export default function MapScreen() {
         NotificationService.removeNotificationListeners(notificationListeners);
       }
     };
-  }, []);
+  }, [auth.currentUser]);
+
+  // DISABLED: Automatic distance checking - only manual analysis will send notifications
+  // This prevents multiple notification systems from running simultaneously
+  useEffect(() => {
+    if (familyMembers.length > 0 && location && location.coords) {
+      const farAwayMembers = familyMembers.filter(member => 
+        member.distance !== undefined && member.distance >= 0.5
+      );
+      
+      if (farAwayMembers.length > 0) {
+        console.log(`ℹ️ ${farAwayMembers.length} family members are far away - notifications will be sent via manual analysis only`);
+      }
+    }
+  }, [familyMembers, location]);
 
   // Save or update current user's location in Firestore
   const updateUserLocation = async (locationData: Location.LocationObject) => {
@@ -336,7 +363,19 @@ export default function MapScreen() {
             return (a.distance || 0) - (b.distance || 0);
           });
           
-                     setFamilyMembers(members);
+          setFamilyMembers(members);
+          
+          // DISABLED: Automatic notification checking - only manual analysis will send notifications
+          // This prevents multiple notification systems from running simultaneously
+          if (members.length > 0 && location && location.coords) {
+            const farAwayMembers = members.filter(member => 
+              member.distance !== undefined && member.distance >= 0.5
+            );
+            
+            if (farAwayMembers.length > 0) {
+              console.log(`ℹ️ ${farAwayMembers.length} family members are far away - notifications will be sent via manual analysis only`);
+            }
+          }
           
           // Automatically add all family members to the map (allUsers array)
           // This ensures family members are always visible on the map
@@ -382,29 +421,74 @@ export default function MapScreen() {
             return [...nonFamilyUsers, ...familyMembersForMap];
           });
           
-                  // No automatic analysis - only when user clicks on "You" marker
-         }
-       }
-     } catch (error) {
-       console.error('Error fetching family members:', error);
-     }
-   };
+          // Automatically check distances and send notifications for family members who are far away
+          if (members.length > 0 && location && location.coords) {
+            console.log('🔍 Automatically checking family member distances on load...');
+            
+            // Check each family member for distance alerts
+            for (const member of members) {
+              if (member.distance !== undefined && member.distance >= 0.5) {
+                console.log(`🚨 ${member.name} is ${member.distance} km away - sending immediate alert`);
+                
+                // Send mobile notification immediately
+                try {
+                  await NotificationService.sendFamilyAlertNotification({
+                    familyMemberName: member.name,
+                    familyMemberId: member.id,
+                    distance: member.distance,
+                    timestamp: new Date().toLocaleTimeString(),
+                    location: {
+                      latitude: location.coords.latitude,
+                      longitude: location.coords.longitude
+                    }
+                  });
+                  console.log(`📱 Sent immediate mobile notification for ${member.name}`);
+                } catch (notificationError) {
+                  console.error('Error sending immediate notification:', notificationError);
+                }
+                
+                // Create notification for explore tab
+                const notification: FamilyNotification = {
+                  id: `${member.id}-auto-alert-${Date.now()}`,
+                  familyMemberId: member.id,
+                  familyMemberName: member.name,
+                  familyMemberEmail: member.email,
+                  timestamp: new Date(),
+                  location: {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                  },
+                  distance: member.distance,
+                  message: `🚨 ALERT: ${member.name} is ${member.distance.toFixed(2)} km away from you!`,
+                  isRead: false
+                };
+                
+                // Add to current user's notifications in Firestore
+                if (auth.currentUser) {
+                  const userRef = doc(db, 'users', auth.currentUser.uid);
+                  await updateDoc(userRef, {
+                    notifications: arrayUnion(notification)
+                  });
+                  console.log(`📱 Added notification to explore tab for ${member.name}`);
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching family members:', error);
+    }
+  };
 
-  // Fetch all users and their locations (both online and offline)
+  // Fetch only current user and family members (not all users)
   const fetchAllUsers = async (): Promise<UserLocation[]> => {
     try {
-      console.log('Fetching all users from database...');
-      const usersRef = collection(db, 'users');
-      
-      // Get ALL users without any filtering
-      const querySnapshot = await getDocs(usersRef);
-      console.log('Total users found in database:', querySnapshot.docs.length);
+      console.log('Fetching only current user and family members...');
       
       const usersData: UserLocation[] = [];
-      let colorIndex = 0;
 
-
-      // First, get current user's family members to check against
+      // First, get current user's family members
       let currentUserFamilyMembers: string[] = [];
       if (auth.currentUser) {
         try {
@@ -419,107 +503,118 @@ export default function MapScreen() {
         }
       }
 
-      for (const doc of querySnapshot.docs) {
-        // Skip the current user's document
-
-        if (doc.id === auth.currentUser?.uid) continue;
-
-        const userData = doc.data();
-
-        console.log('Processing user:', doc.id, userData.email, userData.name);
-        
-        // Check if user has any location data (current location OR last known location)
-        const hasCurrentLocation = userData.location && userData.location.coords;
-        const hasLastLocation = userData.lastLocation && userData.lastLocation.coords;
-        const hasAnyLocation = hasCurrentLocation || hasLastLocation;
-        
-        // Only add users who have actual location data (either current or last known)
-        if (userData.email && hasAnyLocation) {
-          // Check if this user is a family member
-          const isFamilyMember = currentUserFamilyMembers.includes(userData.email);
-          
-          // Determine which location to use
-          let coords: any;
-          let timestamp: any;
-          let isOnline: boolean = false; // Default to offline
-          
-          if (hasCurrentLocation) {
-            // User has current location - check if they are online
-            coords = userData.location.coords;
-            timestamp = userData.location.timestamp;
-            isOnline = isUserOnline(timestamp);
-          } else if (hasLastLocation) {
-            // User only has last known location - they are offline
-            coords = userData.lastLocation.coords;
-            timestamp = userData.lastLocation.timestamp;
-            isOnline = false; // Offline since no current location
+      // Only fetch current user and family members
+      if (auth.currentUser) {
+        // Add current user
+        try {
+          const currentUserDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          if (currentUserDoc.exists()) {
+            const currentUserData = currentUserDoc.data();
+            
+            if (currentUserData.location && currentUserData.location.coords) {
+              usersData.push({
+                id: auth.currentUser.uid,
+                coords: currentUserData.location.coords,
+                timestamp: currentUserData.location.timestamp?.toDate?.()?.getTime() || Date.now(),
+                name: 'You',
+                color: '#0000FF', // Blue for current user
+                userData: currentUserData,
+                isOnline: true,
+                lastSeen: 'Now',
+                isFamilyMember: false
+              });
+            }
           }
-          
-          // Use special color for family members
-          const userColor = isFamilyMember ? '#FF6B35' : USER_COLORS[colorIndex % USER_COLORS.length];
-          
-          usersData.push({
-            id: doc.id,
+        } catch (error) {
+          console.log('Error getting current user data:', error);
+        }
 
-            coords: coords,
-            timestamp: timestamp?.toDate?.()?.getTime() || Date.now(),
-            name: userData.name || userData.email.split('@')[0] || 'User ' + (colorIndex + 1),
-            color: userColor,
-            userData: userData,
-            isOnline: isOnline,
-            lastSeen: userData.lastSeen?.toDate?.()?.toLocaleString() || 
-                     timestamp?.toDate?.()?.toLocaleString() || 'Unknown',
-            isFamilyMember: isFamilyMember
-          });
-          colorIndex++;
-
-        } else if (userData.email) {
-          // Even if user has no location data, add them to the map if they are family members
-          const isFamilyMember = currentUserFamilyMembers.includes(userData.email);
-          
-          if (isFamilyMember) {
-            console.log('Adding family member without location data:', userData.email, userData.name);
+        // Add family members
+        for (const email of currentUserFamilyMembers) {
+          try {
+            const q = query(collection(db, 'users'), where('email', '==', email));
+            const querySnap = await getDocs(q);
             
-            // Create a default location near the current user or use a fallback
-            const defaultCoords = {
-              latitude: location ? location.coords.latitude + (Math.random() - 0.5) * 0.01 : 19.0760,
-              longitude: location ? location.coords.longitude + (Math.random() - 0.5) * 0.01 : 72.8777,
-              altitude: null,
-              accuracy: 1000,
-              altitudeAccuracy: null,
-              heading: null,
-              speed: null,
-            };
-            
-            usersData.push({
-              id: doc.id,
-              coords: defaultCoords,
-              timestamp: Date.now(),
-              name: userData.name || userData.email.split('@')[0] || 'Unknown Family Member',
-              color: '#FF6B35', // Orange for family members
-              userData: userData,
-              isOnline: false,
-              lastSeen: 'No Location Data',
-              isFamilyMember: true
+            querySnap.forEach((doc) => {
+              const userData = doc.data();
+              
+              // Check if user has any location data
+              const hasCurrentLocation = userData.location && userData.location.coords;
+              const hasLastLocation = userData.lastLocation && userData.lastLocation.coords;
+              const hasAnyLocation = hasCurrentLocation || hasLastLocation;
+              
+              if (userData.email && hasAnyLocation) {
+                // Determine which location to use
+                let coords: any;
+                let timestamp: any;
+                let isOnline: boolean = false;
+                
+                if (hasCurrentLocation) {
+                  coords = userData.location.coords;
+                  timestamp = userData.location.timestamp;
+                  isOnline = isUserOnline(timestamp);
+                } else if (hasLastLocation) {
+                  coords = userData.lastLocation.coords;
+                  timestamp = userData.lastLocation.timestamp;
+                  isOnline = false;
+                }
+                
+                usersData.push({
+                  id: doc.id,
+                  coords: coords,
+                  timestamp: timestamp?.toDate?.()?.getTime() || Date.now(),
+                  name: userData.name || userData.email.split('@')[0] || 'Family Member',
+                  color: '#FF6B35', // Orange for family members
+                  userData: userData,
+                  isOnline: isOnline,
+                  lastSeen: userData.lastSeen?.toDate?.()?.toLocaleString() || 
+                           timestamp?.toDate?.()?.toLocaleString() || 'Unknown',
+                  isFamilyMember: true
+                });
+              } else if (userData.email) {
+                // Family member without location data - add with default location
+                console.log('Adding family member without location data:', userData.email, userData.name);
+                
+                const defaultCoords = {
+                  latitude: location ? location.coords.latitude + (Math.random() - 0.5) * 0.01 : 19.0760,
+                  longitude: location ? location.coords.longitude + (Math.random() - 0.5) * 0.01 : 72.8777,
+                  altitude: null,
+                  accuracy: 1000,
+                  altitudeAccuracy: null,
+                  heading: null,
+                  speed: null,
+                };
+                
+                usersData.push({
+                  id: doc.id,
+                  coords: defaultCoords,
+                  timestamp: Date.now(),
+                  name: userData.name || userData.email.split('@')[0] || 'Family Member',
+                  color: '#FF6B35', // Orange for family members
+                  userData: userData,
+                  isOnline: false,
+                  lastSeen: 'No Location Data',
+                  isFamilyMember: true
+                });
+              }
             });
-            colorIndex++;
-          } else {
-            console.log('User has no location data:', userData.email, 'Skipping...');
+          } catch (error) {
+            console.log('Error getting family member data:', error);
           }
         }
       }
-
-             const onlineCount = usersData.filter(u => u.isOnline).length;
-       const offlineCount = usersData.filter(u => !u.isOnline).length;
-       const familyCount = usersData.filter(u => u.isFamilyMember).length;
-       
-       console.log('=== User Count Summary ===');
-       console.log('Total users with location data:', usersData.length);
-       console.log('🟢 Online users (live location):', onlineCount);
-       console.log('🔴 Offline users (last known):', offlineCount);
-       console.log('👨‍👩‍👧‍👦 Family members:', familyCount);
-       console.log('========================');
       
+      const onlineCount = usersData.filter(u => u.isOnline).length;
+      const offlineCount = usersData.filter(u => !u.isOnline).length;
+      const familyCount = usersData.filter(u => u.isFamilyMember).length;
+      
+      console.log('=== User Count Summary ===');
+      console.log('Total users with location data:', usersData.length);
+      console.log('🟢 Online users (live location):', onlineCount);
+      console.log('🔴 Offline users (last known):', offlineCount);
+      console.log('👨‍👩‍👧‍👦 Family members:', familyCount);
+      console.log('========================');
+     
       setAllUsers(usersData);
       
       // Calculate nearby users for the selected user
@@ -529,13 +624,13 @@ export default function MapScreen() {
       
       return usersData;
     } catch (error) {
-      console.error('Error fetching all users:', error);
+      console.error('Error fetching users:', error);
       return [];
     }
   };
 
-  // Calculate route from current user to a specific location
-  const calculateRoute = async (destinationLat: number, destinationLng: number) => {
+  // Calculate route from current user to a specific location and send tracking notification
+  const calculateRoute = async (destinationLat: number, destinationLng: number, destinationUser?: UserLocation) => {
     if (!location) return;
     
     try {
@@ -570,6 +665,53 @@ export default function MapScreen() {
           isVisible: true,
           isMinimized: false
         });
+        
+        // Send tracking notification if destination user is provided
+        if (destinationUser && auth.currentUser) {
+          try {
+            // Get current user's data from Firestore
+            const currentUserDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+            const currentUserName = currentUserDoc.exists() ? currentUserDoc.data()?.name || 'Unknown User' : 'Unknown User';
+            
+                          // Send mobile notification about tracking
+              await NotificationService.sendFamilyAlertNotification({
+                familyMemberName: `${currentUserName} is tracking to ${destinationUser.name}`,
+                familyMemberId: destinationUser.id,
+                distance: 0, // Not distance-based, it's a tracking notification
+                timestamp: new Date().toLocaleTimeString(),
+                location: {
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude
+                }
+              });
+            
+            // Create tracking notification for explore tab
+            const trackingNotification: FamilyNotification = {
+              id: `tracking-${destinationUser.id}-${Date.now()}`,
+              familyMemberId: destinationUser.id,
+              familyMemberName: destinationUser.name,
+              familyMemberEmail: destinationUser.userData?.email || 'Unknown',
+              timestamp: new Date(),
+              location: {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude
+              },
+              distance: 0,
+              message: `🗺️ He is tracking to you - ${destinationUser.name}`,
+              isRead: false
+            };
+            
+            // Add to current user's notifications in Firestore
+            const userRef = doc(db, 'users', auth.currentUser.uid);
+            await updateDoc(userRef, {
+              notifications: arrayUnion(trackingNotification)
+            });
+            
+            console.log(`📱 Sent tracking notification: ${currentUserName} is tracking to ${destinationUser.name}`);
+          } catch (notificationError) {
+            console.error('Error sending tracking notification:', notificationError);
+          }
+        }
         
         // Enhanced map animation to show the complete route
         if (mapRef.current && points.length > 0) {
@@ -940,7 +1082,7 @@ export default function MapScreen() {
 
 
   // Handle marker press
-  const handleMarkerPress = (user: UserLocation) => {
+  const handleMarkerPress = async (user: UserLocation) => {
     setSelectedUser(user);
     setShowUserModal(true);
     
@@ -959,10 +1101,29 @@ export default function MapScreen() {
     // If this is the current user, analyze family members and send notifications
     if (user.name === 'You' && auth.currentUser) {
       fetchFamilyMembers(auth.currentUser.uid);
-      // Trigger family member analysis and send notifications to explore tab
-      setTimeout(() => {
-        analyzeFamilyMembersAndSendNotifications();
-      }, 1000); // Small delay to ensure family members are loaded
+      
+      // Check if we already have notifications in Firestore to prevent duplicates
+      if (auth.currentUser) {
+        try {
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          const userDoc = await getDoc(userRef);
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            const hasExistingNotifications = userData.notifications && userData.notifications.length > 0;
+            
+            if (!hasExistingNotifications) {
+              console.log('🔍 No existing notifications found - running manual analysis...');
+              setTimeout(() => {
+                analyzeFamilyMembersAndSendNotifications();
+              }, 1000); // Small delay to ensure family members are loaded
+            } else {
+              console.log('ℹ️ Existing notifications already exist - skipping manual analysis to prevent duplicates');
+            }
+          }
+        } catch (error) {
+          console.log('Error checking existing notifications:', error);
+        }
+      }
     }
     
     // If this is a family member, show route option
@@ -1378,69 +1539,72 @@ export default function MapScreen() {
       let nearbyCount = 0;
       let offlineCount = 0;
 
-      // Check each family member and send notifications to explore tab ONLY for those far away
+      // Find all family members who are far away for consolidated notification
+      const farAwayMembers = familyMembers.filter(member => 
+        member && member.distance !== undefined && member.distance !== null && member.distance >= 0.5
+      );
+      
+      if (farAwayMembers.length > 0) {
+        farAwayCount = farAwayMembers.length;
+        console.log(`🚨 ${farAwayMembers.length} family members are far away - sending ONE consolidated alert`);
+        
+        // Send ONE consolidated mobile notification for ALL far-away family members
+        try {
+          const memberNames = farAwayMembers.map(m => m.name).join(', ');
+          const maxDistance = Math.max(...farAwayMembers.map(m => m.distance || 0));
+          
+          await NotificationService.sendFamilyAlertNotification({
+            familyMemberName: memberNames,
+            familyMemberId: 'consolidated',
+            distance: maxDistance,
+            timestamp: currentTime,
+            location: {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude
+            }
+          });
+          console.log(`📱 Sent ONE consolidated mobile notification for ${farAwayMembers.length} family members`);
+        } catch (notificationError) {
+          console.error('Error sending consolidated mobile notification:', notificationError);
+        }
+        
+        // Create ONE consolidated notification for explore tab
+        const notification: FamilyNotification = {
+          id: `consolidated-manual-${Date.now()}`,
+          familyMemberId: 'consolidated',
+          familyMemberName: farAwayMembers.map(m => m.name).join(', '),
+          familyMemberEmail: 'consolidated',
+          timestamp: new Date(),
+          location: {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+          },
+          distance: Math.max(...farAwayMembers.map(m => m.distance || 0)),
+          message: `🚨 ALERT: ${farAwayMembers.length} family members are far away at ${currentTime}! Check the map for details.`,
+          isRead: false
+        };
+        
+        // Add to current user's notifications in Firestore
+        if (auth.currentUser) {
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          await updateDoc(userRef, {
+            notifications: arrayUnion(notification)
+          });
+          console.log(`📱 Added ONE consolidated notification to explore tab`);
+        }
+      }
+      
+      // Count nearby and offline members for summary
       for (const member of familyMembers) {
         if (member) {
-          // Check if family member has distance data (online with location)
           if (member.distance !== undefined && member.distance !== null) {
-            console.log(`📍 Analyzing ${member.name}: distance = ${member.distance} km`);
-            const isFarAway = member.distance >= 0.5; // 500 meters or more
-            
-            if (isFarAway) {
-              farAwayCount++;
-              console.log(`🚨 ${member.name} is far away (${member.distance} km) - SENDING ALERT`);
-              // Family member is far away - send notification to explore tab
-              const notification: FamilyNotification = {
-                id: `${member.id}-far-away-${Date.now()}`,
-                familyMemberId: member.id,
-                familyMemberName: member.name,
-                familyMemberEmail: member.email,
-                timestamp: new Date(),
-                location: {
-                  latitude: location.coords.latitude,
-                  longitude: location.coords.longitude
-                },
-                distance: member.distance,
-                message: `🚨 ALERT: ${member.name} is ${member.distance.toFixed(2)} km away from you at ${currentTime}!`,
-                isRead: false
-              };
-
-              // Add notification to current user's notifications in Firestore
-              if (auth.currentUser) {
-                const userRef = doc(db, 'users', auth.currentUser.uid);
-                await updateDoc(userRef, {
-                  notifications: arrayUnion(notification)
-                });
-              }
-
-              // Send mobile push notification
-              try {
-                await NotificationService.sendFamilyAlertNotification({
-                  familyMemberName: member.name,
-                  familyMemberId: member.id,
-                  distance: member.distance,
-                  timestamp: currentTime,
-                  location: {
-                    latitude: location.coords.latitude,
-                    longitude: location.coords.longitude
-                  }
-                });
-                console.log(`📱 Sent mobile notification for ${member.name} (${member.distance.toFixed(2)} km away)`);
-              } catch (notificationError) {
-                console.error('Error sending mobile notification:', notificationError);
-              }
-
-              console.log(`📱 Sent ALERT notification for ${member.name} (${member.distance.toFixed(2)} km away)`);
-            } else {
+            if (member.distance < 0.5) {
               nearbyCount++;
               console.log(`✅ ${member.name} is nearby (${member.distance} km) - NO ALERT NEEDED`);
-              // Family member is nearby - NO notification sent (only count for summary)
             }
           } else {
-            // Family member has no location data (offline)
             offlineCount++;
             console.log(`📱 ${member.name} is offline (no location data) - NO ALERT NEEDED`);
-            // Offline members - NO notification sent (only count for summary)
           }
         }
       }
@@ -1858,7 +2022,8 @@ export default function MapScreen() {
                            console.log('Calculating route to user from modal:', selectedUser.name);
                            calculateRoute(
                              selectedUser.coords.latitude,
-                             selectedUser.coords.longitude
+                             selectedUser.coords.longitude,
+                             selectedUser // Pass the selectedUser for tracking notification
                            );
                            setShowUserModal(false); // Close modal to show route
                          }}
@@ -1963,7 +2128,8 @@ export default function MapScreen() {
                                       console.log('Calculating route to family member:', member.name);
                                       calculateRoute(
                                         familyMemberUser.coords.latitude,
-                                        familyMemberUser.coords.longitude
+                                        familyMemberUser.coords.longitude,
+                                        familyMemberUser // Pass the family member user for tracking notification
                                       );
                                       setShowUserModal(false); // Close modal to show route
                                     } else {
