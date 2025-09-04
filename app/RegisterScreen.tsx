@@ -172,15 +172,15 @@ export default function RegisterScreen() {
             <View style={styles.successIcon}>
               <Text style={styles.successIconText}>✓</Text>
             </View>
-            <Text style={styles.successTitle}>Registration Successful!</Text>
-            <Text style={styles.successSubtitle}>Welcome to Trinetra</Text>
-            <Text style={styles.successDetails}>User data has been saved to database</Text>
+            <Text style={styles.successTitle}>Welcome to Mahakumbh 2025!</Text>
+            <Text style={styles.successSubtitle}>You are now part of the divine gathering</Text>
+            <Text style={styles.successDetails}>May the sacred waters bless your pilgrimage</Text>
             <TouchableOpacity
               style={styles.loginButton}
               onPress={() => router.push('/LoginScreen')}
               activeOpacity={0.8}
             >
-              <Text style={styles.loginButtonText}>Sign In Now</Text>
+              <Text style={styles.loginButtonText}>Enter the Sacred Grounds</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -192,12 +192,12 @@ export default function RegisterScreen() {
                   alert('User signed out. You can now test the login flow.');
                 } catch (error) {
                   console.error('Sign out error:', error);
-                  alert('Sign out failed: ' + error.message);
+                  alert('Sign out failed: ' + (error as any).message);
                 }
               }}
               activeOpacity={0.8}
             >
-              <Text style={styles.signOutButtonText}>Sign Out & Test Login</Text>
+              <Text style={styles.signOutButtonText}>Return to Login</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -218,29 +218,28 @@ export default function RegisterScreen() {
         <View style={styles.headerSection}>
           <View style={styles.logoContainer}>
             <View style={styles.logoCircle}>
-              <Text style={styles.logoText}>T</Text>
+              <Text style={styles.logoText}>ॐ</Text>
             </View>
           </View>
           <Text style={styles.appTitle}>Trinetra</Text>
-          <Text style={styles.appSubtitle}>Join the Smart Community</Text>
+          <Text style={styles.appSubtitle}>Mahakumbh 2025 - Join the Divine Gathering</Text>
         </View>
 
         {/* Registration Form Card */}
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Create Account</Text>
-          <Text style={styles.formSubtitle}>Join Trinetra for smart crowd management</Text>
+          <Text style={styles.formTitle}>Join the Mahakumbh Pilgrimage</Text>
+          <Text style={styles.formSubtitle}>Be part of the world's largest spiritual gathering</Text>
 
           {/* Name Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Full Name</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>👤</Text>
-          <TextInput
+              <TextInput
                 style={styles.textInput}
                 placeholder="Enter your full name"
                 placeholderTextColor="#999"
-            value={name}
-            onChangeText={setName}
+                value={name}
+                onChangeText={setName}
                 autoCapitalize="words"
               />
             </View>
@@ -250,14 +249,13 @@ export default function RegisterScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Phone Number</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>📱</Text>
-          <TextInput
+              <TextInput
                 style={styles.textInput}
                 placeholder="Enter your phone number"
                 placeholderTextColor="#999"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
               />
             </View>
           </View>
@@ -266,14 +264,13 @@ export default function RegisterScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Aadhaar Number</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>🆔</Text>
-          <TextInput
+              <TextInput
                 style={styles.textInput}
                 placeholder="Enter your Aadhaar number"
                 placeholderTextColor="#999"
-            value={aadhaar}
-            onChangeText={setAadhaar}
-            keyboardType="number-pad"
+                value={aadhaar}
+                onChangeText={setAadhaar}
+                keyboardType="number-pad"
                 maxLength={12}
               />
             </View>
@@ -283,14 +280,13 @@ export default function RegisterScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Email Address</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>📧</Text>
-          <TextInput
+              <TextInput
                 style={styles.textInput}
                 placeholder="Enter your email address"
                 placeholderTextColor="#999"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
               />
@@ -301,14 +297,13 @@ export default function RegisterScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputIcon}>🔒</Text>
-          <TextInput
+              <TextInput
                 style={styles.textInput}
                 placeholder="Create a strong password"
                 placeholderTextColor="#999"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
                 autoCapitalize="none"
               />
             </View>
@@ -318,18 +313,17 @@ export default function RegisterScreen() {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Select Role</Text>
             <View style={[styles.inputWrapper, styles.pickerWrapper]}>
-              <Text style={styles.inputIcon}>👑</Text>
-            <Picker
-              selectedValue={role}
-              style={styles.picker}
-              onValueChange={(itemValue: string) => setRole(itemValue)}
-            >
-              <Picker.Item label="User" value="user" />
-              <Picker.Item label="Admin" value="admin" />
-              <Picker.Item label="Medical Admin" value="medicalAdmin" />
-              <Picker.Item label="Global Admin" value="Globaladmin" />
-            </Picker>
-          </View>
+              <Picker
+                selectedValue={role}
+                style={styles.picker}
+                onValueChange={(itemValue: string) => setRole(itemValue)}
+              >
+                <Picker.Item label="User" value="user" />
+                <Picker.Item label="Admin" value="admin" />
+                <Picker.Item label="Medical Admin" value="medicalAdmin" />
+                <Picker.Item label="Global Admin" value="Globaladmin" />
+              </Picker>
+            </View>
           </View>
 
           {/* Register Button */}
@@ -340,322 +334,8 @@ export default function RegisterScreen() {
             activeOpacity={0.8}
           >
             <Text style={styles.registerButtonText}>
-              {isLoading ? 'Creating Account...' : 'Create Account'}
+              {isLoading ? 'Joining Pilgrimage...' : 'Join Mahakumbh 2025'}
             </Text>
-          </TouchableOpacity>
-
-          {/* Debug: Test Database Connection */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={async () => {
-              try {
-                console.log('Testing database connection...');
-                const testDoc = await getDoc(doc(db, 'users', 'test'));
-                console.log('Database connection successful');
-                alert('Database connection successful!');
-              } catch (error) {
-                console.error('Database connection failed:', error);
-                alert('Database connection failed: ' + error.message);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Test Database Connection</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Show Current User Info */}
-          {currentUser && (
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={() => {
-                const userInfo = {
-                  uid: currentUser.uid,
-                  email: currentUser.email,
-                  emailVerified: currentUser.emailVerified,
-                  creationTime: currentUser.metadata?.creationTime
-                };
-                console.log('Current user info:', userInfo);
-                alert('Current User:\n' + JSON.stringify(userInfo, null, 2));
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.debugButtonText}>Show Current User Info</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Debug: Check User in Database */}
-          {currentUser && (
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={async () => {
-                try {
-                  console.log('Checking user in database...');
-                  const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-                  if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    console.log('User found in database:', userData);
-                    alert('User found in database:\n' + JSON.stringify(userData, null, 2));
-                  } else {
-                    console.log('User not found in database');
-                    alert('User NOT found in database!');
-                  }
-                } catch (error) {
-                  console.error('Database check error:', error);
-                  alert('Database check failed: ' + error.message);
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.debugButtonText}>Check User in Database</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Debug: Manually Add User to Database */}
-          {currentUser && (
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={async () => {
-                try {
-                  console.log('Manually adding user to database...');
-                  const timestamp = new Date();
-                  const userData = {
-                    name: 'Debug User',
-                    role: 'user',
-                    phone: '1234567890',
-                    aadhaar: '123456789012',
-                    email: currentUser.email,
-                    uid: currentUser.uid,
-                    createdAt: timestamp,
-                    updatedAt: timestamp,
-                    isActive: true,
-                    familyMembers: [],
-                    notifications: [],
-                    location: null,
-                    lastLocation: null,
-                    lastSeen: timestamp,
-                    relationship: 'User',
-                    registrationTimestamp: timestamp.toISOString(),
-                    debugAdded: true
-                  };
-                  
-                  await setDoc(doc(db, 'users', currentUser.uid), userData);
-                  console.log('User manually added to database');
-                  alert('User manually added to database!');
-                } catch (error) {
-                  console.error('Manual database add error:', error);
-                  alert('Manual database add failed: ' + error.message);
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.debugButtonText}>Manually Add User to DB</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Debug: Clear User from Database */}
-          {currentUser && (
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={async () => {
-                try {
-                  console.log('Clearing user from database...');
-                  await setDoc(doc(db, 'users', currentUser.uid), {});
-                  console.log('User cleared from database');
-                  alert('User cleared from database!');
-                } catch (error) {
-                  console.error('Clear database add error:', error);
-                  alert('Clear database failed: ' + error.message);
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.debugButtonText}>Clear User from DB</Text>
-          </TouchableOpacity>
-          )}
-
-          {/* Debug: Show All Users in Database */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={async () => {
-              try {
-                console.log('Fetching all users from database...');
-                const usersRef = collection(db, 'users');
-                const querySnapshot = await getDocs(usersRef);
-                const users = [];
-                querySnapshot.forEach((doc) => {
-                  users.push({ id: doc.id, ...doc.data() });
-                });
-                console.log('All users in database:', users);
-                alert('Users in database:\n' + JSON.stringify(users, null, 2));
-              } catch (error) {
-                console.error('Fetch all users error:', error);
-                alert('Fetch all users failed: ' + error.message);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Show All Users in DB</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Test Write Permission */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={async () => {
-              try {
-                console.log('Testing write permission...');
-                const testData = {
-                  test: true,
-                  timestamp: new Date().toISOString(),
-                  message: 'Testing write permission'
-                };
-                await setDoc(doc(db, 'test', 'permission-test'), testData);
-                console.log('Write permission test successful');
-                alert('Write permission test successful!');
-                
-                // Clean up test data
-                await setDoc(doc(db, 'test', 'permission-test'), {});
-                console.log('Test data cleaned up');
-              } catch (error) {
-                console.error('Write permission test failed:', error);
-                alert('Write permission test failed: ' + error.message);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Test Write Permission</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Show Firebase Config */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={() => {
-              const config = {
-                projectId: 'todoapp-c9ac2',
-                authDomain: 'todoapp-c9ac2.firebaseapp.com',
-                storageBucket: 'todoapp-c9ac2.firebasestorage.app',
-                messagingSenderId: '378909307345',
-                appId: '1:378909307345:web:0b382724153a1dc91ef0f0'
-              };
-              console.log('Firebase config:', config);
-              alert('Firebase Config:\n' + JSON.stringify(config, null, 2));
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Show Firebase Config</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Test Network Connectivity */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={async () => {
-              try {
-                console.log('Testing network connectivity...');
-                const response = await fetch('https://www.google.com');
-                if (response.ok) {
-                  console.log('Network connectivity test successful');
-                  alert('Network connectivity test successful!');
-                } else {
-                  console.log('Network connectivity test failed');
-                  alert('Network connectivity test failed!');
-                }
-              } catch (error) {
-                console.error('Network connectivity test error:', error);
-                alert('Network connectivity test failed: ' + error.message);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Test Network Connectivity</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Show Auth State */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={() => {
-              const authState = {
-                currentUser: auth.currentUser ? {
-                  uid: auth.currentUser.uid,
-                  email: auth.currentUser.email,
-                  emailVerified: auth.currentUser.emailVerified,
-                  isAnonymous: auth.currentUser.isAnonymous,
-                  metadata: auth.currentUser.metadata
-                } : null,
-                authState: currentUser ? 'Authenticated' : 'Not Authenticated'
-              };
-              console.log('Auth state:', authState);
-              alert('Auth State:\n' + JSON.stringify(authState, null, 2));
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Show Auth State</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Test Firebase Rules */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={async () => {
-              try {
-                console.log('Testing Firebase rules...');
-                
-                // Test read permission
-                try {
-                  await getDocs(collection(db, 'users'));
-                  console.log('Read permission test successful');
-                } catch (readError) {
-                  console.error('Read permission test failed:', readError);
-                  alert('Read permission test failed: ' + readError.message);
-                  return;
-                }
-                
-                // Test write permission
-                try {
-                  const testDoc = doc(db, 'test-rules', 'test-' + Date.now());
-                  await setDoc(testDoc, { test: true, timestamp: new Date() });
-                  console.log('Write permission test successful');
-                  
-                  // Clean up
-                  await setDoc(testDoc, {});
-                  console.log('Test document cleaned up');
-                  
-                  alert('Firebase rules test successful!');
-                } catch (writeError) {
-                  console.error('Write permission test failed:', writeError);
-                  alert('Write permission test failed: ' + writeError.message);
-                }
-              } catch (error) {
-                console.error('Firebase rules test error:', error);
-                alert('Firebase rules test failed: ' + error.message);
-              }
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Test Firebase Rules</Text>
-          </TouchableOpacity>
-
-          {/* Debug: Show Common Error Codes */}
-          <TouchableOpacity
-            style={styles.debugButton}
-            onPress={() => {
-              const commonErrors = {
-                'permission-denied': 'Firebase security rules are blocking access',
-                'unavailable': 'Firebase service is unavailable',
-                'unauthenticated': 'User is not authenticated',
-                'not-found': 'Document or collection not found',
-                'already-exists': 'Document already exists',
-                'failed-precondition': 'Operation failed due to a precondition',
-                'aborted': 'Operation was aborted',
-                'out-of-range': 'Operation is out of valid range',
-                'unimplemented': 'Operation is not implemented',
-                'internal': 'Internal error occurred',
-                'unavailable': 'Service is currently unavailable',
-                'data-loss': 'Unrecoverable data loss or corruption'
-              };
-              console.log('Common Firebase error codes:', commonErrors);
-              alert('Common Firebase Error Codes:\n' + JSON.stringify(commonErrors, null, 2));
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.debugButtonText}>Show Common Error Codes</Text>
           </TouchableOpacity>
 
           {/* Divider */}
@@ -672,14 +352,14 @@ export default function RegisterScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.loginText}>
-              Already have an account? <Text style={styles.loginTextBold}>Sign In</Text>
+              Already a pilgrim? <Text style={styles.loginTextBold}>Enter Sacred Space</Text>
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>© 2024 Trinetra. All rights reserved.</Text>
+          <Text style={styles.footerText}>© 2025 Mahakumbh Trinetra. Blessed by the Divine.</Text>
     </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -689,7 +369,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -700,119 +380,37 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: height * 0.35,
+    height: height * 0.3,
     backgroundColor: '#FF8C00',
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    borderBottomLeftRadius: 40,
+    borderBottomRightRadius: 40,
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   headerSection: {
     alignItems: 'center',
-    paddingTop: height * 0.06,
-    paddingBottom: 30,
+    paddingTop: height * 0.05,
+    paddingBottom: 25,
   },
   logoContainer: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  logoText: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  appTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
-  },
-  appSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  formCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 24,
-    padding: 32,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-    marginTop: -20,
-  },
-  formTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  formSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  inputContainer: {
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: '#f8f9fa',
-  },
-  pickerWrapper: {
-    paddingVertical: 8,
-  },
-  inputIcon: {
-    fontSize: 20,
-    marginRight: 16,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '500',
-  },
-  picker: {
-    flex: 1,
-    height: 50,
-    color: '#333',
-  },
-  registerButton: {
-    backgroundColor: '#FF8C00',
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    shadowColor: '#FF8C00',
+    borderColor: 'rgba(255, 255, 255, 0.4)',
+    shadowColor: '#FFFFFF',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -820,55 +418,146 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  logoText: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  appTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 5,
+  },
+  appSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontWeight: '500',
+  },
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 18,
+    padding: 24,
+    borderRadius: 20,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+    marginTop: -12,
+  },
+  formTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#000000',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  formSubtitle: {
+    fontSize: 13,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  inputContainer: {
+    marginBottom: 18,
+    alignItems: 'center',
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 7,
+    alignSelf: 'flex-start',
+    width: '100%',
+    maxWidth: 280,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    width: '100%',
+    maxWidth: 280,
+    height: 44,
+  },
+  pickerWrapper: {
+    paddingVertical: 6,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#000000',
+    fontWeight: '500',
+    height: '100%',
+    paddingVertical: 0,
+  },
+  picker: {
+    flex: 1,
+    height: 44,
+    color: '#000000',
+  },
+  registerButton: {
+    backgroundColor: '#FF8C00',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
     alignSelf: 'center',
-    minWidth: 200,
+    minWidth: 180,
+    height: 46,
   },
   registerButtonDisabled: {
     opacity: 0.7,
   },
   registerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  debugButton: {
-    backgroundColor: '#6c757d',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    alignSelf: 'center',
-    minWidth: 200,
-  },
-  debugButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: 'bold',
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 18,
+    width: '100%',
+    maxWidth: 280,
+    alignSelf: 'center',
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: '#E5E7EB',
   },
   dividerText: {
-    marginHorizontal: 16,
-    color: '#9ca3af',
-    fontSize: 14,
+    marginHorizontal: 12,
+    color: '#9CA3AF',
+    fontSize: 12,
     fontWeight: '500',
   },
   loginLink: {
     alignItems: 'center',
   },
   loginText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 13,
+    color: '#666666',
   },
   loginTextBold: {
     color: '#FF8C00',
@@ -876,11 +565,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: 20,
   },
   footerText: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: 10,
+    color: '#9CA3AF',
   },
   // Success Screen Styles
   successContainer: {
@@ -894,69 +583,73 @@ const styles = StyleSheet.create({
   },
   successContent: {
     alignItems: 'center',
-    padding: 40,
+    padding: 32,
   },
   successIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
-    borderWidth: 4,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    marginBottom: 24,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   successIconText: {
-    fontSize: 50,
-    color: '#fff',
+    fontSize: 44,
+    color: '#FFFFFF',
     fontWeight: 'bold',
   },
   successTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
+    color: '#FFFFFF',
+    marginBottom: 10,
     textAlign: 'center',
   },
   successSubtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
   },
   successDetails: {
-    fontSize: 14,
+    fontSize: 13,
     color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 40,
+    marginBottom: 32,
     textAlign: 'center',
     fontStyle: 'italic',
   },
   loginButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 40,
-    paddingVertical: 16,
-    borderRadius: 25,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
+    minWidth: 160,
+    height: 46,
   },
   loginButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: 'bold',
   },
   signOutButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 30,
-    paddingVertical: 14,
-    borderRadius: 25,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
-    marginTop: 16,
+    marginTop: 12,
+    minWidth: 160,
+    height: 42,
   },
   signOutButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

@@ -16,6 +16,7 @@ export default function AdminTabLayout() {
       <Tabs.Screen name="index" options={{ title: 'CCTV' }} />
       <Tabs.Screen name="alerts" options={{ title: 'Alerts' }} />
       <Tabs.Screen name="missing" options={{ title: 'Missing' }} />
+      <Tabs.Screen name="unusual-detection" options={{ title: 'Unusual' }} />
       <Tabs.Screen name="disaster" options={{ title: 'Disaster' }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile' }} />
     </Tabs>

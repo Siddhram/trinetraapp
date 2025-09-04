@@ -1,8 +1,10 @@
 import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../lib/firebase';
 import NotificationService from '../../lib/notificationService';
+
+const { width } = Dimensions.get('window');
 
 type FamilyNotification = {
   id: string;
@@ -142,8 +144,13 @@ export default function TabTwoScreen() {
     <View style={[styles.notificationCard, item.isRead && styles.notificationCardRead]}>
       <View style={styles.notificationHeader}>
         <View style={styles.notificationTitleContainer}>
-          <Text style={styles.notificationTitle}>👨‍👩‍👧‍👦 Family Alert</Text>
-          {!item.isRead && <View style={styles.unreadIndicator} />}
+          <View style={styles.familyIconContainer}>
+            <Text style={styles.familyIcon}>👥</Text>
+          </View>
+          <View style={styles.titleContainer}>
+            <Text style={styles.notificationTitle}>Family Alert</Text>
+            {!item.isRead && <View style={styles.unreadIndicator} />}
+          </View>
         </View>
         <Text style={styles.notificationTime}>
           {new Date(item.timestamp).toLocaleString()}
@@ -154,13 +161,17 @@ export default function TabTwoScreen() {
       
       <View style={styles.notificationDetails}>
         <View style={styles.notificationDetailRow}>
-          <Text style={styles.notificationDetailIcon}>📍</Text>
+          <View style={styles.detailIconContainer}>
+            <Text style={styles.detailIcon}>📍</Text>
+          </View>
           <Text style={styles.notificationDetailText}>
             Distance: <Text style={styles.notificationDetailValue}>{item.distance.toFixed(2)} km</Text>
           </Text>
         </View>
         <View style={styles.notificationDetailRow}>
-          <Text style={styles.notificationDetailIcon}>🌍</Text>
+          <View style={styles.detailIconContainer}>
+            <Text style={styles.detailIcon}>🌍</Text>
+          </View>
           <Text style={styles.notificationDetailText}>
             Location: <Text style={styles.notificationDetailValue}>
               {item.location.latitude.toFixed(4)}, {item.location.longitude.toFixed(4)}
@@ -175,14 +186,14 @@ export default function TabTwoScreen() {
             style={styles.markReadButton}
             onPress={() => markNotificationAsRead(item.id)}
           >
-            <Text style={styles.markReadButtonText}>✓ Mark Read</Text>
+            <Text style={styles.markReadButtonText}>Mark Read</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity 
           style={styles.clearButton}
           onPress={() => clearNotification(item.id)}
         >
-          <Text style={styles.clearButtonText}>🗑️ Clear</Text>
+          <Text style={styles.clearButtonText}>Clear</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -193,7 +204,7 @@ export default function TabTwoScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>👨‍👩‍👧‍👦 Family Alerts</Text>
+          <Text style={styles.headerTitle}>Family Alerts</Text>
           <Text style={styles.headerSubtitle}>Stay connected with your family</Text>
         </View>
         <View style={styles.headerIcon}>
@@ -204,16 +215,25 @@ export default function TabTwoScreen() {
       {/* Notification Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
+          <View style={styles.statIconContainer}>
+            <Text style={styles.statIcon}>📊</Text>
+          </View>
           <Text style={styles.statNumber}>{familyNotifications.length}</Text>
           <Text style={styles.statLabel}>Total Alerts</Text>
         </View>
         <View style={styles.statCard}>
+          <View style={styles.statIconContainer}>
+            <Text style={styles.statIcon}>🔴</Text>
+          </View>
           <Text style={styles.statNumber}>
             {familyNotifications.filter(n => !n.isRead).length}
           </Text>
           <Text style={styles.statLabel}>Unread</Text>
         </View>
         <View style={styles.statCard}>
+          <View style={styles.statIconContainer}>
+            <Text style={styles.statIcon}>📍</Text>
+          </View>
           <Text style={styles.statNumber}>
             {familyNotifications.filter(n => n.distance >= 1).length}
           </Text>
@@ -242,7 +262,7 @@ export default function TabTwoScreen() {
           </Text>
           <View style={styles.noNotificationsInfo}>
             <Text style={styles.noNotificationsInfoText}>
-              💡 Tip: Make sure location sharing is enabled for all family members
+              Tip: Make sure location sharing is enabled for all family members
             </Text>
           </View>
         </View>
@@ -279,7 +299,7 @@ export default function TabTwoScreen() {
               }
             }}
           >
-            <Text style={styles.quickActionButtonText}>✓ Mark All Read</Text>
+            <Text style={styles.quickActionButtonText}>Mark All Read</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -299,7 +319,7 @@ export default function TabTwoScreen() {
               );
             }}
           >
-            <Text style={styles.quickActionButtonText}>🗑️ Clear All</Text>
+            <Text style={styles.quickActionButtonText}>Clear All</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -311,79 +331,95 @@ const styles = StyleSheet.create({
   // Container
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8F9FA',
   },
   
   // Header
   header: {
     backgroundColor: '#FF8C00',
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingTop: 30,
+    paddingBottom: 12,
     paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 16,
+    elevation: 12,
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    color: '#FFFFFF',
+    marginBottom: 1,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
   headerIcon: {
-    width: 60,
-    height: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 30,
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   headerIconText: {
-    fontSize: 28,
+    fontSize: 14,
   },
   
   // Stats Container
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 20,
+    paddingVertical: 2,
     gap: 12,
   },
   statCard: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     padding: 16,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#FFE0B2',
+    borderColor: '#E5E7EB',
+  },
+  statIconContainer: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statIcon: {
+    fontSize: 14,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#FF6B35',
-    marginBottom: 4,
+    color: '#FF8C00',
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 11,
+    color: '#6B7280',
     textAlign: 'center',
     fontWeight: '600',
   },
@@ -447,22 +483,22 @@ const styles = StyleSheet.create({
   
   // Notification Cards
   notificationCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: '#FFE0B2',
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
   notificationCardRead: {
-    borderColor: '#E0E0E0',
-    backgroundColor: '#fafafa',
-    opacity: 0.8,
+    borderColor: '#D1D5DB',
+    backgroundColor: '#F9FAFB',
+    opacity: 0.9,
   },
   notificationHeader: {
     flexDirection: 'row',
@@ -473,53 +509,75 @@ const styles = StyleSheet.create({
   notificationTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  familyIconContainer: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  familyIcon: {
+    fontSize: 16,
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
   notificationTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#FF6B35',
+    color: '#FF8C00',
   },
   unreadIndicator: {
     width: 8,
     height: 8,
-    backgroundColor: '#FF6B35',
+    backgroundColor: '#FF8C00',
     borderRadius: 4,
   },
   notificationTime: {
     fontSize: 12,
-    color: '#999',
+    color: '#9CA3AF',
     fontWeight: '500',
   },
   notificationMessage: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: 15,
+    color: '#374151',
     marginBottom: 16,
-    lineHeight: 24,
+    lineHeight: 22,
     fontWeight: '500',
   },
   notificationDetails: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   notificationDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  notificationDetailIcon: {
-    fontSize: 16,
-    marginRight: 8,
-    width: 20,
-    textAlign: 'center',
+  detailIconContainer: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  detailIcon: {
+    fontSize: 14,
   },
   notificationDetailText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
     flex: 1,
   },
   notificationDetailValue: {
     fontWeight: 'bold',
-    color: '#FF6B35',
+    color: '#FF8C00',
   },
   notificationActions: {
     flexDirection: 'row',
@@ -527,35 +585,35 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   markReadButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#4CAF50',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   markReadButtonText: {
-    color: 'white',
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: 'bold',
   },
   clearButton: {
-    backgroundColor: '#F44336',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#F44336',
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    shadowColor: '#EF4444',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   clearButtonText: {
-    color: 'white',
-    fontSize: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: 'bold',
   },
   
@@ -563,16 +621,16 @@ const styles = StyleSheet.create({
   quickActionsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 12,
-    backgroundColor: 'white',
+    paddingVertical: 24,
+    gap: 16,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: '#E5E7EB',
   },
   quickActionButton: {
     flex: 1,
     backgroundColor: '#FF8C00',
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 25,
     alignItems: 'center',
     shadowColor: '#FF8C00',
@@ -582,7 +640,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   quickActionButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
   },

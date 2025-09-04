@@ -10,6 +10,7 @@ export default function CCTVScreen() {
       <View style={styles.buttonContainer}>
         <Button title="Crowd Detection" color="#FFA500" onPress={() => router.push('/crowdDetection')} />
         <Button title="Lost and Found" color="#FFA500" onPress={() => router.push('/lostAndFound')} />
+        <Button title="Face Detection Analysis" color="#FFA500" onPress={() => router.push('/faceDetectionAnalysis')} />
         <Button title="Future Crowd Detection Alert" color="#FFA500" onPress={() => router.push('/futureCrowdAlert')} />
         <Button title="Traffic Level Detection" color="#FFA500" onPress={() => router.push('/trafficLevelDetection')} />
       </View>
