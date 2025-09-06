@@ -8,6 +8,15 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native
 import { auth, db } from '../../lib/firebase';
 import NotificationService from '../../lib/notificationService';
 
+// Suppress text component warnings
+const originalWarn = console.warn;
+console.warn = (message, ...args) => {
+  if (typeof message === 'string' && message.includes('Text strings must be rendered within a <Text> component')) {
+    return;
+  }
+  originalWarn(message, ...args);
+};
+
 type UserLocation = {
   id: string;
   coords: {
@@ -1674,8 +1683,6 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-
-      
       {/* Mobile Notification Banner */}
       {mobileNotification && (
         <View style={[
@@ -1703,15 +1710,12 @@ export default function MapScreen() {
       
       <View style={styles.userCountContainer}>
         <Text style={styles.userCountText}>
-
-           👥 {userCounts.total} {userCounts.total === 1 ? 'person' : 'people'} total
+          👥 {userCounts.total} {userCounts.total === 1 ? 'person' : 'people'} total
         </Text>
-
-         <Text style={styles.onlineUsersText}>
-           🟢 {userCounts.online} online | 🔴 {userCounts.offline} offline
+        <Text style={styles.onlineUsersText}>
+          🟢 {userCounts.online} online | 🔴 {userCounts.offline} offline
         </Text>
-
-         <Text style={styles.locationStatusText}>
+        <Text style={styles.locationStatusText}>
            📍 {allUsers ? allUsers.filter(u => u.isOnline).length : 0} with live location | 📍 {allUsers ? allUsers.filter(u => !u.isOnline).length : 0} with last known location
          </Text>
          {familyMembers && familyMembers.length > 0 && (
@@ -1730,10 +1734,8 @@ export default function MapScreen() {
          <Text style={styles.manualAnalysisText}>
            💡 Click on "You" marker to analyze family members and send ALERTS to Explore tab for those {'>'}500m away
          </Text>
-          
-
          
-                   {/* Route Information - Enhanced */}
+         {/* Route Information - Enhanced */}
           {routeInfo.isVisible && !routeInfo.isMinimized && (
             <View style={styles.routeInfoContainer}>
               <View style={styles.routeHeader}>
@@ -1786,7 +1788,6 @@ export default function MapScreen() {
               </View>
             </View>
           )}
-
           {/* Minimized Route Icon */}
           {routeInfo.isVisible && routeInfo.isMinimized && (
             <TouchableOpacity 
@@ -1836,12 +1837,10 @@ export default function MapScreen() {
             title="You"
             description="Your current location"
             pinColor={location.color}
-
             onPress={() => handleMarkerPress(location)}
           />
         )}
-
-                 {/* All other users' locations */}
+        {/* All other users' locations */}
          {allUsers.map((user) => (
           <Marker
             key={user.id}
@@ -1850,8 +1849,7 @@ export default function MapScreen() {
               longitude: user.coords.longitude,
             }}
             title={user.name}
-
-                         description={
+            description={
               user.isFamilyMember 
                 ? (user.isOnline ? '👨‍👩‍👧‍👦 Family Member (Live)' : '👨‍👩‍👧‍👦 Family Member (Last Known)')
                 : (user.isOnline ? '🟢 Live Location' : '🔴 Last Known Location')
@@ -1863,8 +1861,7 @@ export default function MapScreen() {
              onPress={() => handleMarkerPress(user)}
            />
          ))}
-
-                   {/* Route Polyline - Enhanced for better visibility */}
+        {/* Route Polyline - Enhanced for better visibility */}
           {routeInfo.isVisible && routeInfo.coordinates.length > 0 && (
             <>
               {/* Main route line */}

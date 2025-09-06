@@ -1,27 +1,18 @@
 ﻿import { Ionicons } from '@expo/vector-icons';
-
+import { ResizeMode, Video } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
-
 import { useRouter } from 'expo-router';
-
 import React, { useState } from 'react';
-
 import {
-    ActivityIndicator,
-
-    Alert,
-
-    ScrollView,
-
-    StyleSheet,
-
-    Text,
-
-    TextInput,
-
-    TouchableOpacity,
-
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 
 import { AlertData, AlertStorage } from '../lib/alertStorage';
@@ -56,21 +47,28 @@ interface CrowdAssessment {
 
 
 
+const { width, height } = Dimensions.get('window');
+
 export default function FutureCrowdAlertScreen() {
-
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
   const [analysisResult, setAnalysisResult] = useState<CrowdAssessment | null>(null);
-
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
-
   const [location, setLocation] = useState('Mahakumbh, Prayagraj');
-
   const [context, setContext] = useState('');
-
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoRef, setVideoRef] = useState<Video | null>(null);
   const router = useRouter();
 
-
+  const toggleVideoPlayback = async () => {
+    if (videoRef) {
+      if (isVideoPlaying) {
+        await videoRef.pauseAsync();
+      } else {
+        await videoRef.playAsync();
+      }
+      setIsVideoPlaying(!isVideoPlaying);
+    }
+  };
 
   const pickVideo = async () => {
 
@@ -240,7 +238,7 @@ export default function FutureCrowdAlertScreen() {
 
         try {
 
-          response = await fetch('http://192.168.31.47:5000/analyze', {
+          response = await fetch('http://172.20.10.4:5001/analyze', {
 
             method: 'POST',
 
@@ -489,136 +487,171 @@ export default function FutureCrowdAlertScreen() {
 
 
   return (
-
-    <ScrollView style={styles.container}>
-
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      
+      {/* Professional Header */}
       <View style={styles.header}>
-
-        <TouchableOpacity 
-
-          style={styles.backButton} 
-
-          onPress={() => router.back()}
-
-        >
-
-          <Ionicons name="arrow-back" size={24} color="#FFA500" />
-
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Future Crowd Detection</Text>
-
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#333333" />
+          </TouchableOpacity>
+          
+          <View style={styles.titleSection}>
+            <View style={styles.cameraIconContainer}>
+              <Ionicons name="videocam" size={28} color="#FF8C00" />
+            </View>
+            <View style={styles.titleTextContainer}>
+              <Text style={styles.title}>VIGILANT VISION NETWORK</Text>
+              <Text style={styles.subtitle}>Future Crowd Analysis</Text>
+            </View>
+          </View>
+          
+          <View style={styles.statusIndicator}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>LIVE</Text>
+          </View>
+        </View>
       </View>
 
-
-
-      <View style={styles.content}>
-
-        <View style={styles.uploadSection}>
-
-          <View style={styles.sectionHeader}>
-
-            <Ionicons name="analytics" size={24} color="#FFA500" />
-
-            <Text style={styles.sectionTitle}>Government Video Analysis System</Text>
-
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* Live Feed Section */}
+        <View style={styles.liveFeedSection}>
+          <View style={styles.liveFeedHeader}>
+            <Text style={styles.liveFeedTitle}>Crowd Analysis Camera</Text>
+            <View style={styles.liveFeedControls}>
+              <TouchableOpacity style={styles.controlButton}>
+                <Ionicons name="cloud" size={20} color="#666666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.controlButton}>
+                <Ionicons name="mic" size={20} color="#666666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.controlButton}>
+                <Ionicons name="person" size={20} color="#666666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.controlButton}>
+                <Ionicons name="volume-high" size={20} color="#666666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.controlButton}>
+                <Ionicons name="location" size={20} color="#666666" />
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <Text style={styles.description}>
-
-            Upload or record video for AI-powered crowd density analysis and safety assessment. 
-
-            All data is securely stored for government compliance and audit purposes.
-
-          </Text>
-
-
-
-          <View style={styles.inputContainer}>
-
-            <Text style={styles.label}>Location:</Text>
-
-            <TextInput
-
-              style={styles.input}
-
-              value={location}
-
-              onChangeText={setLocation}
-
-              placeholder="Enter location"
-
-            />
-
+          
+          <View style={styles.videoContainer}>
+            {selectedVideo ? (
+              <View style={styles.videoPreviewContainer}>
+                <Video
+                  ref={setVideoRef}
+                  style={styles.videoPlayer}
+                  source={{ uri: selectedVideo.uri }}
+                  resizeMode={ResizeMode.COVER}
+                  shouldPlay={false}
+                  isLooping={false}
+                  onPlaybackStatusUpdate={(status) => {
+                    if (status.isLoaded) {
+                      setIsVideoPlaying(status.isPlaying);
+                    }
+                  }}
+                />
+                <TouchableOpacity 
+                  style={styles.playButton}
+                  onPress={toggleVideoPlayback}
+                >
+                  <Ionicons 
+                    name={isVideoPlaying ? "pause" : "play"} 
+                    size={40} 
+                    color="#FFFFFF" 
+                  />
+                </TouchableOpacity>
+                <View style={styles.videoOverlay}>
+                  <Text style={styles.videoText}>{selectedVideo.fileName || selectedVideo.name || 'Crowd Analysis Video'}</Text>
+                  <Text style={styles.videoSubtext}>
+                    {selectedVideo.duration ? `${Math.round(selectedVideo.duration)}s` : 'Unknown duration'}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.placeholderVideo}>
+                <View style={styles.placeholderIconContainer}>
+                  <Ionicons name="videocam-outline" size={60} color="#FF8C00" />
+                </View>
+                <Text style={styles.placeholderText}>No Video Selected</Text>
+                <Text style={styles.placeholderSubtext}>Select or record a video to begin analysis</Text>
+              </View>
+            )}
           </View>
-
-
-
-          <View style={styles.inputContainer}>
-
-            <Text style={styles.label}>Context:</Text>
-
-            <TextInput
-
-              style={styles.input}
-
-              value={context}
-
-              onChangeText={setContext}
-
-              placeholder="Additional context (optional)"
-
-            />
-
+          
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.actionButton}>
+              <Ionicons name="camera" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Picture</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.activeButton]}>
+              <Ionicons name="mic" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Speak</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton}>
+              <Ionicons name="recording" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Record</Text>
+            </TouchableOpacity>
           </View>
+        </View>
 
-
-
-          <View style={styles.buttonContainer}>
-
-            <TouchableOpacity
-
-              style={[styles.uploadButton, styles.halfButton]}
-
+        {/* Video Selection Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Video Input Options</Text>
+          
+          <View style={styles.videoOptionsGrid}>
+            <TouchableOpacity 
+              style={styles.videoOptionButton}
               onPress={pickVideo}
-
-              disabled={isAnalyzing}
-
             >
-
-              <Ionicons name="folder-open" size={24} color="white" />
-
-              <Text style={styles.uploadButtonText}>
-
-                {isAnalyzing ? 'Analyzing...' : 'Select Video'}
-
-              </Text>
-
+              <Ionicons name="folder-open" size={24} color="#FF8C00" />
+              <Text style={styles.videoOptionButtonText}>Select Video</Text>
             </TouchableOpacity>
-
-
-
-            <TouchableOpacity
-
-              style={[styles.uploadButton, styles.halfButton, styles.cameraButton]}
-
+            
+            <TouchableOpacity 
+              style={styles.videoOptionButton}
               onPress={captureVideo}
-
-              disabled={isAnalyzing}
-
             >
-
-              <Ionicons name="videocam" size={24} color="white" />
-
-              <Text style={styles.uploadButtonText}>
-
-                {isAnalyzing ? 'Analyzing...' : 'Record Video'}
-
-              </Text>
-
+              <Ionicons name="camera" size={24} color="#FF8C00" />
+              <Text style={styles.videoOptionButtonText}>Record Video</Text>
             </TouchableOpacity>
-
           </View>
+        </View>
+
+        {/* Analysis Controls */}
+        {selectedVideo && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Analysis Controls</Text>
+            
+            <TouchableOpacity 
+              style={styles.analyzeButton}
+              onPress={() => analyzeVideo(selectedVideo)}
+              disabled={isAnalyzing}
+            >
+              {isAnalyzing ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="analytics" size={20} color="#FFFFFF" />
+                  <Text style={styles.analyzeButtonText}>Start Analysis</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+
+
+
+
+
 
 
 
@@ -702,7 +735,7 @@ export default function FutureCrowdAlertScreen() {
 
                 <TouchableOpacity
 
-                  style={[styles.analyzeButton, styles.halfButton]}
+                  style={styles.analyzeButton}
 
                   onPress={() => analyzeVideo(selectedVideo)}
 
@@ -724,7 +757,7 @@ export default function FutureCrowdAlertScreen() {
 
                 <TouchableOpacity
 
-                  style={[styles.clearButton, styles.halfButton]}
+                  style={styles.clearButton}
 
                   onPress={() => setSelectedVideo(null)}
 
@@ -758,195 +791,144 @@ export default function FutureCrowdAlertScreen() {
 
           )}
 
-        </View>
-
         {analysisResult && (
-
           <View style={styles.resultSection}>
-
+            {/* Professional Header */}
             <View style={styles.resultHeader}>
-
-              <Ionicons name="shield-checkmark" size={24} color="#4CAF50" />
-
-              <Text style={styles.sectionTitle}>Government Analysis Result</Text>
-
+              <View style={styles.resultHeaderLeft}>
+                <View style={styles.resultIconContainer}>
+                  <Ionicons name="analytics" size={24} color="#FFFFFF" />
+                </View>
+                <View style={styles.resultTitleContainer}>
+                  <Text style={styles.resultMainTitle}>Crowd Analysis Complete</Text>
+                  <Text style={styles.resultSubtitle}>AI-powered security assessment</Text>
+                </View>
+              </View>
               <View style={styles.resultBadge}>
-
+                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
                 <Text style={styles.resultBadgeText}>VERIFIED</Text>
-
               </View>
-
             </View>
 
-            
-
-            <View style={styles.crowdLevelCard}>
-
-              <View style={styles.crowdLevelHeader}>
-
-                <Ionicons 
-
-                  name={getCrowdLevelIcon(analysisResult.crowd_level)} 
-
-                  size={32} 
-
-                  color={getCrowdLevelColor(analysisResult.crowd_level)} 
-
-                />
-
-                <Text style={[styles.crowdLevelText, { color: getCrowdLevelColor(analysisResult.crowd_level) }]}>
-
-                  {analysisResult.crowd_level.toUpperCase()}
-
-                </Text>
-
+            {/* KPI Summary Cards */}
+            <View style={styles.kpiContainer}>
+              <View style={[styles.kpiCard, styles.kpiCardPrimary]}>
+                <View style={styles.kpiIconContainer}>
+                  <Ionicons name="people" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={styles.kpiNumber}>{analysisResult.estimated_people}</Text>
+                <Text style={styles.kpiLabel}>Crowd Count</Text>
               </View>
-
-              <Text style={styles.estimatedPeople}>
-
-                Estimated People: {analysisResult.estimated_people}
-
-              </Text>
-
+              
+              <View style={[styles.kpiCard, styles.kpiCardSecondary]}>
+                <View style={styles.kpiIconContainer}>
+                  <Ionicons name={getCrowdLevelIcon(analysisResult.crowd_level)} size={18} color="#FFFFFF" />
+                </View>
+                <Text style={styles.kpiNumber}>{analysisResult.crowd_level.toUpperCase()}</Text>
+                <Text style={styles.kpiLabel}>Risk Level</Text>
+              </View>
+              
+              <View style={[styles.kpiCard, styles.kpiCardTertiary]}>
+                <View style={styles.kpiIconContainer}>
+                  <Ionicons name="shield-checkmark" size={18} color="#FFFFFF" />
+                </View>
+                <Text style={styles.kpiNumber}>{analysisResult.police_required ? analysisResult.police_count : 0}</Text>
+                <Text style={styles.kpiLabel}>Police Needed</Text>
+              </View>
             </View>
 
-
-
-            <View style={styles.detailCard}>
-
-              <Text style={styles.detailTitle}>Safety Recommendations</Text>
-
-               
-
-              <View style={styles.recommendationRow}>
-
-                <Ionicons name="shield-checkmark" size={20} color="#4CAF50" />
-
-                <Text style={styles.recommendationText}>
-
-                  Police Required: {analysisResult.police_required ? 'Yes' : 'No'}
-
-                  {analysisResult.police_required && ` (${analysisResult.police_count} personnel)`}
-
-                </Text>
-
-              </View>
-
-
-
-              <View style={styles.recommendationRow}>
-
-                <Ionicons name="medical" size={20} color="#2196F3" />
-
-                <Text style={styles.recommendationText}>
-
-                  Medical Required: {analysisResult.medical_required ? 'Yes' : 'No'}
-
-                  {analysisResult.medical_required && ` (${analysisResult.medical_staff_count} staff)`}
-
-                </Text>
-
-              </View>
-
-
-
-              <View style={styles.recommendationRow}>
-
-                <Ionicons 
-
-                  name={analysisResult.chokepoints_detected ? "warning" : "checkmark-circle"} 
-
-                  size={20} 
-
-                  color={analysisResult.chokepoints_detected ? "#FF9800" : "#4CAF50"} 
-
-                />
-
-                <Text style={styles.recommendationText}>
-
-                  Chokepoints: {analysisResult.chokepoints_detected ? 'Detected' : 'None'}
-
-                </Text>
-
-              </View>
-
-
-
-              <View style={styles.recommendationRow}>
-
-                <Ionicons 
-
-                  name={analysisResult.emergency_access_clear ? "checkmark-circle" : "close-circle"} 
-
-                  size={20} 
-
-                  color={analysisResult.emergency_access_clear ? "#4CAF50" : "#F44336"} 
-
-                />
-
-                <Text style={styles.recommendationText}>
-
-                  Emergency Access: {analysisResult.emergency_access_clear ? 'Clear' : 'Blocked'}
-
-                </Text>
-
-              </View>
-
-            </View>
-
-
-
-            <View style={styles.detailCard}>
-
-              <Text style={styles.detailTitle}>Activities Observed</Text>
-
-              <View style={styles.activitiesContainer}>
-
-                {analysisResult.activities.map((activity, index) => (
-
-                  <View key={index} style={styles.activityTag}>
-
-                    <Text style={styles.activityText}>{activity}</Text>
-
+            {/* Safety Status Overview */}
+            <View style={styles.statusOverviewCard}>
+              <Text style={styles.statusOverviewTitle}>Safety Status Overview</Text>
+              <View style={styles.statusGrid}>
+                <View style={styles.statusItem}>
+                  <View style={[styles.statusIndicator, { backgroundColor: analysisResult.police_required ? '#FF8C00' : '#4CAF50' }]}>
+                    <Ionicons name="shield" size={16} color="#FFFFFF" />
                   </View>
-
-                ))}
-
+                  <Text style={styles.statusLabel}>Police</Text>
+                  <Text style={styles.statusValue}>{analysisResult.police_required ? 'Required' : 'Not Required'}</Text>
+                </View>
+                
+                <View style={styles.statusItem}>
+                  <View style={[styles.statusIndicator, { backgroundColor: analysisResult.medical_required ? '#FF8C00' : '#4CAF50' }]}>
+                    <Ionicons name="medical" size={16} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.statusLabel}>Medical</Text>
+                  <Text style={styles.statusValue}>{analysisResult.medical_required ? 'Required' : 'Not Required'}</Text>
+                </View>
+                
+                <View style={styles.statusItem}>
+                  <View style={[styles.statusIndicator, { backgroundColor: analysisResult.chokepoints_detected ? '#F44336' : '#4CAF50' }]}>
+                    <Ionicons name="warning" size={16} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.statusLabel}>Chokepoints</Text>
+                  <Text style={styles.statusValue}>{analysisResult.chokepoints_detected ? 'Detected' : 'Clear'}</Text>
+                </View>
+                
+                <View style={styles.statusItem}>
+                  <View style={[styles.statusIndicator, { backgroundColor: analysisResult.emergency_access_clear ? '#4CAF50' : '#F44336' }]}>
+                    <Ionicons name="exit" size={16} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.statusLabel}>Emergency Access</Text>
+                  <Text style={styles.statusValue}>{analysisResult.emergency_access_clear ? 'Clear' : 'Blocked'}</Text>
+                </View>
               </View>
-
             </View>
 
-
-
-            <View style={styles.detailCard}>
-
-              <Text style={styles.detailTitle}>Risk Assessment</Text>
-
-              <Text style={styles.riskText}>
-
-                Harm Likelihood: {analysisResult.harm_likelihood}
-
-              </Text>
-
-              {analysisResult.notes && (
-
-                <Text style={styles.notesText}>
-
-                  Notes: {analysisResult.notes}
-
-                </Text>
-
-              )}
-
+            {/* Activities Detected */}
+            <View style={styles.activitiesCard}>
+              <Text style={styles.activitiesTitle}>Activities Detected</Text>
+              <View style={styles.activitiesGrid}>
+                {analysisResult.activities.map((activity, index) => (
+                  <View key={index} style={styles.activityChip}>
+                    <Ionicons name="eye" size={12} color="#FF8C00" />
+                    <Text style={styles.activityChipText}>{activity}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
 
+            {/* Risk Assessment */}
+            <View style={styles.riskAssessmentCard}>
+              <View style={styles.riskHeader}>
+                <Ionicons name="alert-circle" size={16} color="#FF8C00" />
+                <Text style={styles.riskTitle}>Risk Assessment</Text>
+              </View>
+              <View style={styles.riskContent}>
+                <View style={styles.riskItem}>
+                  <Text style={styles.riskLabel}>Harm Likelihood</Text>
+                  <View style={styles.riskValueContainer}>
+                    <Text style={[styles.riskValue, { color: getCrowdLevelColor(analysisResult.harm_likelihood) }]}>
+                      {analysisResult.harm_likelihood}
+                    </Text>
+                  </View>
+                </View>
+                {analysisResult.notes && (
+                  <View style={styles.notesContainer}>
+                    <Text style={styles.notesLabel}>Analysis Notes</Text>
+                    <Text style={styles.notesText}>{analysisResult.notes}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity style={styles.primaryActionButton}>
+                <Ionicons name="download" size={16} color="#FFFFFF" />
+                <Text style={styles.primaryActionText}>Export Report</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryActionButton}>
+                <Ionicons name="share" size={16} color="#FF8C00" />
+                <Text style={styles.secondaryActionText}>Share Analysis</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-
         )}
 
-      </View>
+      </ScrollView>
 
-    </ScrollView>
+    </View>
 
   );
 
@@ -960,71 +942,497 @@ const styles = StyleSheet.create({
 
     flex: 1,
 
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
 
   },
 
   header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+
+  headerContent: {
 
     flexDirection: 'row',
 
     alignItems: 'center',
 
-    padding: 20,
-
-    paddingTop: 60,
-
-    backgroundColor: 'white',
-
-    borderBottomWidth: 1,
-
-    borderBottomColor: '#e0e0e0',
+    justifyContent: 'space-between',
 
   },
 
   backButton: {
 
-    marginRight: 15,
+    padding: 8,
 
-    padding: 5,
+    borderRadius: 20,
+
+    backgroundColor: '#F8F9FA',
+
+  },
+
+  titleSection: {
+
+    flex: 1,
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+  },
+
+  cameraIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  titleTextContainer: {
+
+    flex: 1,
 
   },
 
   title: {
 
-    fontSize: 24,
+    fontSize: 16,
 
     fontWeight: 'bold',
 
-    color: '#FFA500',
+    color: '#333333',
+
+    marginBottom: 2,
 
   },
 
-  content: {
+  subtitle: {
 
-    padding: 20,
+    fontSize: 14,
+
+    color: '#666666',
+
+    fontWeight: '500',
 
   },
 
-  uploadSection: {
 
-    backgroundColor: 'white',
+  statusDot: {
+
+    width: 6,
+
+    height: 6,
+
+    borderRadius: 3,
+
+    backgroundColor: '#FFFFFF',
+
+    marginRight: 4,
+
+  },
+
+  statusText: {
+
+    fontSize: 10,
+
+    fontWeight: 'bold',
+
+    color: '#FFFFFF',
+
+  },
+
+  scrollView: {
+
+    flex: 1,
+
+  },
+
+  scrollContent: {
+
+    paddingBottom: 100,
+
+  },
+
+  liveFeedSection: {
+
+    marginBottom: 24,
+
+    paddingHorizontal: 20,
+
+  },
+
+  liveFeedHeader: {
+
+    flexDirection: 'row',
+
+    justifyContent: 'space-between',
+
+    alignItems: 'center',
+
+    marginBottom: 16,
+
+  },
+
+  liveFeedTitle: {
+
+    fontSize: 16,
+
+    fontWeight: 'bold',
+
+    color: '#333333',
+
+  },
+
+  liveFeedControls: {
+
+    flexDirection: 'row',
+
+    gap: 12,
+
+  },
+
+  controlButton: {
+
+    width: 36,
+
+    height: 36,
+
+    borderRadius: 18,
+
+    backgroundColor: '#F8F9FA',
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+  },
+
+  videoContainer: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    height: 220,
+    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+
+  videoPreviewContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+
+  playButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -25 }, { translateY: -25 }],
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+
+  videoOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 12,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+
+  placeholderIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+
+  videoPreview: {
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+  },
+
+  videoText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+
+  videoSubtext: {
+    fontSize: 14,
+    color: '#E0E0E0',
+  },
+
+  placeholderVideo: {
+
+    alignItems: 'center',
+
+    justifyContent: 'center',
+
+  },
+
+  placeholderText: {
+
+    fontSize: 16,
+
+    fontWeight: 'bold',
+
+    color: '#999999',
+
+    marginTop: 12,
+
+  },
+
+  placeholderSubtext: {
+
+    fontSize: 14,
+
+    color: '#CCCCCC',
+
+    marginTop: 4,
+
+    textAlign: 'center',
+
+  },
+
+  actionButtons: {
+
+    flexDirection: 'row',
+
+    justifyContent: 'space-around',
+
+    gap: 12,
+
+  },
+
+  actionButton: {
+
+    flex: 1,
+
+    backgroundColor: '#666666',
 
     borderRadius: 12,
 
-    padding: 20,
+    paddingVertical: 12,
 
-    marginBottom: 20,
+    paddingHorizontal: 16,
 
-    shadowColor: '#000',
+    flexDirection: 'row',
 
-    shadowOffset: { width: 0, height: 2 },
+    alignItems: 'center',
 
+    justifyContent: 'center',
+
+    gap: 8,
+
+  },
+
+  activeButton: {
+
+    backgroundColor: '#2196F3',
+
+  },
+
+  actionButtonText: {
+
+    fontSize: 16,
+
+    fontWeight: '600',
+
+    color: '#FFFFFF',
+
+  },
+
+  section: {
+
+    marginBottom: 24,
+
+    paddingHorizontal: 20,
+
+  },
+
+  sectionTitle: {
+
+    fontSize: 16,
+
+    fontWeight: 'bold',
+
+    color: '#000000',
+
+    marginBottom: 16,
+
+  },
+
+  videoOptionsGrid: {
+
+    flexDirection: 'row',
+
+    gap: 12,
+
+  },
+
+  videoOptionButton: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 2,
+    borderColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-
     shadowRadius: 4,
+    elevation: 2,
+  },
 
-    elevation: 3,
+  videoOptionButtonText: {
+
+    fontSize: 16,
+
+    fontWeight: '600',
+
+    color: '#FF8C00',
+
+  },
+
+  inputContainer: {
+
+    marginBottom: 16,
+
+  },
+
+  label: {
+
+    fontSize: 16,
+
+    fontWeight: '600',
+
+    color: '#333333',
+
+    marginBottom: 8,
+
+  },
+
+  input: {
+
+    backgroundColor: '#F8F9FA',
+
+    borderRadius: 12,
+
+    paddingHorizontal: 16,
+
+    paddingVertical: 12,
+
+    fontSize: 16,
+
+    color: '#333333',
+
+    borderWidth: 1,
+
+    borderColor: '#E0E0E0',
+
+  },
+
+  textArea: {
+
+    height: 80,
+
+    textAlignVertical: 'top',
+
+  },
+
+  analyzeButton: {
+    backgroundColor: '#FF8C00',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 8,
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  analyzeButtonText: {
+
+    fontSize: 16,
+
+    fontWeight: 'bold',
+
+    color: '#FFFFFF',
 
   },
 
@@ -1038,19 +1446,6 @@ const styles = StyleSheet.create({
 
   },
 
-  sectionTitle: {
-
-    fontSize: 20,
-
-    fontWeight: 'bold',
-
-    color: '#333',
-
-    marginLeft: 10,
-
-    marginBottom: 10,
-
-  },
 
   description: {
 
@@ -1064,39 +1459,8 @@ const styles = StyleSheet.create({
 
   },
 
-  inputContainer: {
 
-    marginBottom: 15,
 
-  },
-
-  label: {
-
-    fontSize: 16,
-
-    fontWeight: '600',
-
-    color: '#333',
-
-    marginBottom: 5,
-
-  },
-
-  input: {
-
-    borderWidth: 1,
-
-    borderColor: '#ddd',
-
-    borderRadius: 8,
-
-    padding: 12,
-
-    fontSize: 16,
-
-    backgroundColor: '#f9f9f9',
-
-  },
 
   buttonContainer: {
 
@@ -1108,47 +1472,7 @@ const styles = StyleSheet.create({
 
   },
 
-  uploadButton: {
 
-    flexDirection: 'row',
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-
-    backgroundColor: '#FFA500',
-
-    padding: 15,
-
-    borderRadius: 8,
-
-    flex: 1,
-
-  },
-
-  halfButton: {
-
-    flex: 1,
-
-  },
-
-  cameraButton: {
-
-    backgroundColor: '#2196F3',
-
-  },
-
-  uploadButtonText: {
-
-    color: 'white',
-
-    fontSize: 16,
-
-    fontWeight: '600',
-
-    marginLeft: 10,
-
-  },
 
   videoPreviewSection: {
 
@@ -1235,37 +1559,366 @@ const styles = StyleSheet.create({
   },
 
   resultHeader: {
-
     flexDirection: 'row',
-
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
 
-    marginBottom: 20,
+  resultHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
 
+  resultIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FF8C00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+
+  resultTitleContainer: {
+    flex: 1,
+  },
+
+  resultMainTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 4,
+  },
+
+  resultSubtitle: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
   },
 
   resultBadge: {
-
     backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
 
-    paddingHorizontal: 8,
+  kpiContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
 
-    paddingVertical: 4,
-
+  kpiCard: {
+    flex: 1,
     borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    minHeight: 80,
+  },
 
-    marginLeft: 'auto',
+  kpiCardPrimary: {
+    backgroundColor: '#007BFF',
+  },
 
+  kpiCardSecondary: {
+    backgroundColor: '#FF8C00',
+  },
+
+  kpiCardTertiary: {
+    backgroundColor: '#4CAF50',
+  },
+
+  kpiIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+
+  kpiNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+
+  kpiLabel: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '600',
+    textAlign: 'center',
   },
 
   resultBadgeText: {
-
     color: 'white',
-
-    fontSize: 10,
-
+    fontSize: 12,
     fontWeight: 'bold',
+    marginLeft: 4,
+  },
 
+  statusOverviewCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+
+  statusOverviewTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 12,
+  },
+
+  statusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+
+  statusItem: {
+    flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
+  statusIndicator: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+
+  statusLabel: {
+    fontSize: 11,
+    color: '#666666',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+
+  statusValue: {
+    fontSize: 12,
+    color: '#333333',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  activitiesCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+
+  activitiesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 12,
+  },
+
+  activitiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+
+  activityChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
+  activityChipText: {
+    fontSize: 12,
+    color: '#FF8C00',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+
+  riskAssessmentCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+
+  riskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  riskTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginLeft: 8,
+  },
+
+  riskContent: {
+    gap: 12,
+  },
+
+  riskItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
+  riskLabel: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '600',
+  },
+
+  riskValueContainer: {
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+
+  riskValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  notesContainer: {
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 10,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
+  notesLabel: {
+    fontSize: 13,
+    color: '#666666',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+
+  notesText: {
+    fontSize: 13,
+    color: '#333333',
+    lineHeight: 18,
+  },
+
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  primaryActionButton: {
+    flex: 1,
+    backgroundColor: '#FF8C00',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  primaryActionText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  secondaryActionButton: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 2,
+    borderColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
+  secondaryActionText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF8C00',
   },
 
   videoInfoText: {
@@ -1286,35 +1939,7 @@ const styles = StyleSheet.create({
 
   },
 
-  analyzeButton: {
 
-    flexDirection: 'row',
-
-    alignItems: 'center',
-
-    justifyContent: 'center',
-
-    backgroundColor: '#4CAF50',
-
-    padding: 15,
-
-    borderRadius: 8,
-
-    flex: 1,
-
-  },
-
-  analyzeButtonText: {
-
-    color: 'white',
-
-    fontSize: 16,
-
-    fontWeight: '600',
-
-    marginLeft: 10,
-
-  },
 
   clearButton: {
 
@@ -1365,23 +1990,16 @@ const styles = StyleSheet.create({
   },
 
   resultSection: {
-
-    backgroundColor: 'white',
-
-    borderRadius: 12,
-
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 20,
-
-    shadowColor: '#000',
-
-    shadowOffset: { width: 0, height: 2 },
-
-    shadowOpacity: 0.1,
-
-    shadowRadius: 4,
-
-    elevation: 3,
-
+    marginHorizontal: 20,
+    marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
   },
 
   crowdLevelCard: {
@@ -1516,14 +2134,5 @@ const styles = StyleSheet.create({
 
   },
 
-  notesText: {
-
-    fontSize: 14,
-
-    color: '#666',
-
-    fontStyle: 'italic',
-
-  },
 
 });

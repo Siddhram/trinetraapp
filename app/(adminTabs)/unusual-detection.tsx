@@ -5,7 +5,9 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Image,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,14 +16,22 @@ import {
 
 const { width } = Dimensions.get('window');
 
+interface PersonImage {
+  image: string;
+  confidence: number;
+  bbox: [number, number, number, number];
+}
+
 interface AnalysisResult {
   frame: number;
   timestamp_sec: number;
   analysis: {
-    status: 'normal' | 'anomaly' | 'critical' | 'error';
-    summary: string;
+    status: 'normal' | 'anomaly' | 'critical' | 'error' | 'safe' | 'danger';
+    summary?: string;
     weapons: string[];
   };
+  frame_screenshot?: string;
+  person_images?: PersonImage[];
 }
 
 interface ApiResponse {
@@ -39,7 +49,7 @@ export default function UnusualDetectionScreen() {
   // Backend API URL - Update this to match your server
   // For local development: 'http://localhost:5002'
   // For production: 'https://your-domain.com'
-  const API_BASE_URL = 'http://192.168.1.3:5002';
+  const API_BASE_URL = 'http://172.20.10.4:5002';
 
   const pickVideo = async () => {
     try {
@@ -52,26 +62,29 @@ export default function UnusualDetectionScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow both images and videos
         allowsEditing: true,
         quality: 1,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedFile(result.assets[0].fileName || 'selected_video.mp4');
-        setSelectedFileUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        const fileName = asset.fileName || (asset.type?.includes('image') ? 'selected_image.jpg' : 'selected_video.mp4');
+        setSelectedFile(fileName);
+        setSelectedFileUri(asset.uri);
         setError(null);
         setAnalysisResults([]);
+        console.log(`📁 Selected file: ${fileName} (${asset.type})`);
       }
     } catch (err) {
-      console.error('Error picking video:', err);
-      setError('Failed to select video file');
+      console.error('Error picking file:', err);
+      setError('Failed to select file');
     }
   };
 
   const analyzeVideo = async () => {
     if (!selectedFile || !selectedFileUri) {
-      Alert.alert('No File Selected', 'Please select a video file first.');
+      Alert.alert('No File Selected', 'Please select a file first.');
       return;
     }
 
@@ -109,6 +122,18 @@ export default function UnusualDetectionScreen() {
       }
 
       const data: ApiResponse = await response.json();
+      console.log('📊 Analysis Results:', data.results);
+      
+      // Debug: Check for images in results
+      data.results?.forEach((result, index) => {
+        if (result.frame_screenshot) {
+          console.log(`📸 Frame ${result.frame} has screenshot:`, result.frame_screenshot.substring(0, 50) + '...');
+        }
+        if (result.person_images && result.person_images.length > 0) {
+          console.log(`👤 Frame ${result.frame} has ${result.person_images.length} person images`);
+        }
+      });
+      
       setAnalysisResults(data.results || []);
       
       if (data.results && data.results.length === 0) {
@@ -117,7 +142,19 @@ export default function UnusualDetectionScreen() {
 
     } catch (err) {
       console.error('Analysis error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to analyze video');
+      let errorMessage = 'Failed to analyze video';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('Server error: 500')) {
+          errorMessage = 'Server error: Please check if the backend is running and try again';
+        } else if (err.message.includes('Server error: 400')) {
+          errorMessage = 'Invalid file format: Please upload a valid video file';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
       setUploadProgress(0);
@@ -133,70 +170,98 @@ export default function UnusualDetectionScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'critical': return '#ff4444';
+      case 'critical': 
+      case 'danger': return '#ff4444';
       case 'anomaly': return '#ff8800';
       case 'error': return '#666666';
       case 'normal': 
+      case 'safe':
       default: return '#00aa00';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'critical': return 'warning';
+      case 'critical': 
+      case 'danger': return 'warning';
       case 'anomaly': return 'alert-circle';
       case 'error': return 'close-circle';
       case 'normal':
+      case 'safe':
       default: return 'checkmark-circle';
     }
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Unusual Detection Analysis</Text>
-        <Text style={styles.subtitle}>
-          Upload video files to detect anomalies and weapons using AI{'\n'}
-          • Analyzes every 5 seconds of video{'\n'}
-          • Uses Gemini AI for intelligent detection
-        </Text>
-      </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.titleContainer}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="shield-checkmark" size={20} color="#FFFFFF" />
+              </View>
+              <View style={styles.titleTextContainer}>
+                <Text style={styles.title}>Anomaly Detection</Text>
+                <Text style={styles.subtitle}>
+                  AI-powered behavior analysis & threat detection
+                </Text>
+              </View>
+            </View>
+            <View style={styles.statusBadge}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>LIVE</Text>
+            </View>
+          </View>
+        </View>
 
-      {/* File Selection Section */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Video File</Text>
-        <TouchableOpacity style={styles.fileButton} onPress={pickVideo}>
-          <Ionicons name="videocam" size={24} color="#007AFF" />
-          <Text style={styles.fileButtonText}>
-            {selectedFile ? selectedFile : 'Choose Video File'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Analysis Controls */}
-      <View style={styles.section}>
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.analyzeButton, isAnalyzing && styles.disabledButton]}
-            onPress={analyzeVideo}
-            disabled={isAnalyzing || !selectedFile}
-          >
-            {isAnalyzing ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Ionicons name="analytics" size={20} color="#fff" />
-            )}
-            <Text style={styles.analyzeButtonText}>
-              {isAnalyzing ? 'Analyzing...' : 'Analyze Video'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.clearButton} onPress={clearResults}>
-            <Ionicons name="trash" size={20} color="#ff4444" />
-            <Text style={styles.clearButtonText}>Clear</Text>
+        {/* File Selection Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Media Input</Text>
+          <TouchableOpacity style={styles.fileButton} onPress={pickVideo}>
+            <View style={styles.fileButtonContent}>
+              <Ionicons name="images" size={18} color="#FF8C00" />
+              <View style={styles.fileButtonTextContainer}>
+                <Text style={styles.fileButtonText}>
+                  {selectedFile ? 'File Selected' : 'Select Image or Video'}
+                </Text>
+                {selectedFile && (
+                  <Text style={styles.fileButtonSubtext} numberOfLines={1}>
+                    {selectedFile}
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={16} color="#FF8C00" />
+            </View>
           </TouchableOpacity>
         </View>
-      </View>
+
+        {/* Analysis Controls */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Analysis Controls</Text>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.analyzeButton, isAnalyzing && styles.disabledButton]}
+              onPress={analyzeVideo}
+              disabled={isAnalyzing || !selectedFile}
+            >
+              {isAnalyzing ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Ionicons name="analytics" size={16} color="#fff" />
+              )}
+              <Text style={styles.analyzeButtonText}>
+                {isAnalyzing ? 'Analyzing...' : 'Start Analysis'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.clearButton} onPress={clearResults}>
+              <Ionicons name="close-circle" size={16} color="#FF8C00" />
+              <Text style={styles.clearButtonText}>Clear</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
       {/* Progress Indicator */}
       {isAnalyzing && (
@@ -216,135 +281,275 @@ export default function UnusualDetectionScreen() {
         </View>
       )}
 
-      {/* Results Section */}
-      {analysisResults.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Analysis Results ({analysisResults.length} frames analyzed)
-          </Text>
-          
-                     {analysisResults.map((result, index) => {
-             const analysis = result.analysis;
-             return (
-               <View key={index} style={styles.resultCard}>
-                 <View style={styles.resultHeader}>
-                   <View style={styles.timestampContainer}>
-                     <Ionicons name="time" size={16} color="#666" />
-                     <Text style={styles.timestamp}>
-                       {Math.floor(result.timestamp_sec / 60)}:{(result.timestamp_sec % 60).toFixed(0).padStart(2, '0')}
-                     </Text>
-                   </View>
-                   <View style={styles.statusContainer}>
-                     <Ionicons 
-                       name={getStatusIcon(analysis.status)} 
-                       size={16} 
-                       color={getStatusColor(analysis.status)} 
-                     />
-                     <Text style={[styles.statusText, { color: getStatusColor(analysis.status) }]}>
-                       {analysis.status.toUpperCase()}
-                     </Text>
-                   </View>
-                 </View>
-                 
-                 <Text style={styles.summaryText}>
-                   {analysis.summary}
-                 </Text>
-                 
-                 {analysis.weapons && analysis.weapons.length > 0 && (
-                   <View style={styles.weaponsContainer}>
-                     <Text style={styles.weaponsLabel}>⚠️ Weapons Detected:</Text>
-                     <View style={styles.weaponsList}>
-                       {analysis.weapons.map((weapon: string, weaponIndex: number) => (
-                         <View key={weaponIndex} style={styles.weaponTag}>
-                           <Ionicons name="warning" size={12} color="#ff4444" />
-                           <Text style={styles.weaponText}>{weapon}</Text>
-                         </View>
-                       ))}
-                     </View>
-                   </View>
-                 )}
-               </View>
-             );
-           })}
-        </View>
-      )}
+        {/* Results Section */}
+        {analysisResults.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.resultsHeader}>
+              <View style={styles.resultsTitleContainer}>
+                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                <Text style={styles.sectionTitle}>
+                  Analysis Results
+                </Text>
+              </View>
+              <View style={styles.resultsCount}>
+                <Text style={styles.resultsCountText}>{analysisResults.length} frames</Text>
+              </View>
+            </View>
+            
+            {analysisResults.map((result, index) => {
+              const analysis = result.analysis;
+              return (
+                <View key={index} style={styles.resultCard}>
+                  <View style={styles.resultHeader}>
+                    <View style={styles.timestampContainer}>
+                      <Ionicons name="time" size={14} color="#666" />
+                      <Text style={styles.timestamp}>
+                        {Math.floor(result.timestamp_sec / 60)}:{(result.timestamp_sec % 60).toFixed(0).padStart(2, '0')}
+                      </Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(analysis.status) }]}>
+                      <Ionicons 
+                        name={getStatusIcon(analysis.status)} 
+                        size={12} 
+                        color="#FFFFFF" 
+                      />
+                      <Text style={styles.statusText}>
+                        {analysis.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  {analysis.summary && (
+                    <Text style={styles.summaryText} numberOfLines={3}>
+                      {analysis.summary}
+                    </Text>
+                  )}
+                  
+                  {analysis.weapons && analysis.weapons.length > 0 && (
+                    <View style={styles.weaponsContainer}>
+                      <Text style={styles.weaponsLabel}>⚠️ Weapons Detected:</Text>
+                      <View style={styles.weaponsList}>
+                        {analysis.weapons.map((weapon: string, weaponIndex: number) => (
+                          <View key={weaponIndex} style={styles.weaponTag}>
+                            <Ionicons name="warning" size={10} color="#ff4444" />
+                            <Text style={styles.weaponText}>{weapon}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
 
-      {/* Instructions */}
-      <View style={styles.instructionsSection}>
-        <Text style={styles.instructionsTitle}>Instructions:</Text>
-                 <Text style={styles.instructionsText}>
-           • Select a video file from your device{'\n'}
-           • Click "Analyze Video" to process the footage{'\n'}
-           • AI analyzes every 5 seconds of video for anomalies{'\n'}
-           • Results show structured analysis with timestamps{'\n'}
-           • 🚨 CRITICAL: Weapons or high-risk situations{'\n'}
-           • ⚠️ ANOMALY: Unusual but non-lethal activities{'\n'}
-           • ✅ NORMAL: No suspicious activity detected
-         </Text>
-      </View>
-    </ScrollView>
+                  {/* Frame Screenshot Display */}
+                  {result.frame_screenshot && (
+                    <View style={styles.imageContainer}>
+                      <Text style={styles.imageLabel}>📸 Frame Screenshot</Text>
+                      <View style={styles.screenshotContainer}>
+                        <Image 
+                          source={{ uri: result.frame_screenshot }} 
+                          style={styles.frameScreenshot}
+                          resizeMode="cover"
+                          onLoad={() => console.log('✅ Frame screenshot loaded successfully')}
+                          onError={(error) => console.log('❌ Frame screenshot failed to load:', error)}
+                        />
+                        <View style={styles.screenshotOverlay}>
+                          <Ionicons name="camera" size={16} color="#FFFFFF" />
+                          <Text style={styles.screenshotText}>Weapon Detected</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Person Images Display */}
+                  {result.person_images && result.person_images.length > 0 ? (
+                    <View style={styles.personsContainer}>
+                      <Text style={styles.personsLabel}>👤 Detected Persons ({result.person_images.length})</Text>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.personsScroll}>
+                        {result.person_images.map((person, personIndex) => (
+                          <View key={personIndex} style={styles.personImageContainer}>
+                            <Image 
+                              source={{ uri: person.image }} 
+                              style={styles.personImage}
+                              resizeMode="cover"
+                              onLoad={() => console.log(`✅ Person ${personIndex + 1} image loaded successfully`)}
+                              onError={(error) => console.log(`❌ Person ${personIndex + 1} image failed to load:`, error)}
+                            />
+                            <View style={styles.personInfo}>
+                              <Text style={styles.personConfidence}>
+                                {(person.confidence * 100).toFixed(0)}% match
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  ) : result.frame_screenshot && analysis.weapons && analysis.weapons.length > 0 ? (
+                    <View style={styles.noPersonsContainer}>
+                      <Text style={styles.noPersonsText}>
+                        ℹ️ No persons detected in this frame - weapon detection only
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Instructions */}
+        <View style={styles.instructionsSection}>
+          <View style={styles.instructionsHeader}>
+            <Ionicons name="information-circle" size={18} color="#FF8C00" />
+            <Text style={styles.instructionsTitle}>How it works</Text>
+          </View>
+          <Text style={styles.instructionsText}>
+            • Select an image or video file from your device{'\n'}
+            • Click "Start Analysis" to process the media{'\n'}
+            • AI analyzes for weapons and suspicious objects{'\n'}
+            • Detects persons when weapons are found{'\n'}
+            • Results show detailed analysis with images{'\n'}
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: '#FFFFFF',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
+    marginBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#F0F0F0',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 22,
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  section: {
-    backgroundColor: '#fff',
-    margin: 16,
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FF8C00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
-  sectionTitle: {
+  titleTextContainer: {
+    flex: 1,
+  },
+  title: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    shadowColor: '#4CAF50',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+    marginRight: 4,
+  },
+  section: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
     marginBottom: 16,
   },
   fileButton: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  fileButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
-    borderRadius: 8,
-    backgroundColor: '#f8f9ff',
+  },
+  fileButtonTextContainer: {
+    flex: 1,
+    marginLeft: 12,
   },
   fileButtonText: {
-    marginLeft: 8,
     fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
+    color: '#333333',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  fileButtonSubtext: {
+    fontSize: 14,
+    color: '#666666',
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     gap: 12,
   },
   analyzeButton: {
@@ -352,123 +557,171 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FF8C00',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     gap: 8,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#CCCCCC',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   analyzeButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   clearButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ff4444',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#FF8C00',
     gap: 8,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   clearButtonText: {
-    color: '#ff4444',
+    color: '#FF8C00',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   progressSection: {
-    margin: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   progressText: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
     marginBottom: 8,
     textAlign: 'center',
+    fontWeight: '500',
   },
   progressBar: {
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
+    height: 6,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 2,
+    backgroundColor: '#FF8C00',
+    borderRadius: 3,
   },
   errorSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    margin: 16,
+    marginHorizontal: 20,
+    marginBottom: 20,
     padding: 16,
-    backgroundColor: '#fff5f5',
-    borderRadius: 8,
+    backgroundColor: '#FFF5F5',
+    borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#ff4444',
+    borderLeftColor: '#F44336',
     gap: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   errorText: {
     flex: 1,
     fontSize: 14,
-    color: '#ff4444',
+    color: '#F44336',
     lineHeight: 20,
+    fontWeight: '500',
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  resultsTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  resultsCount: {
+    backgroundColor: '#F0F0F0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  resultsCountText: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '600',
   },
   resultCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8F9FA',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: '#FF8C00',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   resultHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   timestampContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   timestamp: {
     fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+    color: '#666666',
+    fontWeight: '600',
   },
   statusText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'uppercase',
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginLeft: 4,
   },
   summaryText: {
     fontSize: 14,
-    color: '#333',
+    color: '#333333',
     lineHeight: 20,
     marginBottom: 8,
   },
   weaponsContainer: {
-    marginTop: 8,
+    marginTop: 12,
   },
   weaponsLabel: {
     fontSize: 12,
-    color: '#ff4444',
+    color: '#F44336',
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   weaponsList: {
     flexDirection: 'row',
@@ -478,36 +731,141 @@ const styles = StyleSheet.create({
   weaponTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#FFF5F5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ff4444',
+    borderColor: '#F44336',
     gap: 4,
   },
   weaponText: {
     fontSize: 12,
-    color: '#ff4444',
+    color: '#F44336',
     fontWeight: '500',
   },
   instructionsSection: {
-    margin: 16,
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: '#FF8C00',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  instructionsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   instructionsTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginLeft: 8,
   },
   instructionsText: {
     fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+    color: '#666666',
+    lineHeight: 22,
+  },
+  imageContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  imageLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF8C00',
+    marginBottom: 8,
+  },
+  screenshotContainer: {
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  frameScreenshot: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#F0F0F0',
+  },
+  screenshotOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 68, 68, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  screenshotText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  personsContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  personsLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF8C00',
+    marginBottom: 8,
+  },
+  personsScroll: {
+    flexDirection: 'row',
+  },
+  personImageContainer: {
+    marginRight: 12,
+    alignItems: 'center',
+  },
+  personImage: {
+    width: 80,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: '#F0F0F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  personInfo: {
+    marginTop: 4,
+    alignItems: 'center',
+  },
+  personConfidence: {
+    fontSize: 10,
+    color: '#666666',
+    fontWeight: '600',
+  },
+  noPersonsContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+    padding: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF8C00',
+  },
+  noPersonsText: {
+    fontSize: 12,
+    color: '#666666',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
 });

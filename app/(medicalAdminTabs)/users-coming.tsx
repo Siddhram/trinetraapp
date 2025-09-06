@@ -1,24 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import FirebaseService, { UserRoute } from '../../lib/firebaseService';
 
+const { width } = Dimensions.get('window');
+
 const getStatusColor = (status: UserRoute['status']) => {
   switch (status) {
-    case 'active': return '#28a745';
-    case 'completed': return '#6c757d';
-    case 'cancelled': return '#dc3545';
-    default: return '#6c757d';
+    case 'active': return '#20B2AA';
+    case 'completed': return '#32CD32';
+    case 'cancelled': return '#E74C3C';
+    default: return '#7F8C8D';
   }
 };
 
@@ -51,10 +54,10 @@ const getHospitalTypeIcon = (type: UserRoute['hospitalType']) => {
 
 const getHospitalTypeColor = (type: UserRoute['hospitalType']) => {
   switch (type) {
-    case 'hospital': return '#FF6B6B';
+    case 'hospital': return '#20B2AA';
     case 'clinic': return '#4ECDC4';
-    case 'medical': return '#FF6B6B';
-    default: return '#95A5A6';
+    case 'medical': return '#20B2AA';
+    default: return '#7F8C8D';
   }
 };
 
@@ -116,44 +119,55 @@ export default function UsersComingScreen() {
     : routes.filter(route => route.status === selectedFilter);
 
   const renderRouteItem = ({ item }: { item: UserRoute }) => (
-    <View style={styles.routeItem}>
-             {/* Header with user info and status */}
-       <View style={styles.routeHeader}>
-         <View style={styles.userInfo}>
-           <Text style={styles.userName}>{item.userName}</Text>
-           <Text style={styles.userContact}>{item.userPhone} • {item.userEmail}</Text>
-           <Text style={styles.userDetails}>
-             Aadhaar: {item.userAadhaar} • Role: {item.userRole} • {item.userRelationship}
-           </Text>
-           <Text style={styles.userDetails}>
-             Status: {item.userIsActive ? 'Active' : 'Inactive'} • Family Members: {item.userFamilyMembers?.length || 0}
-           </Text>
-         </View>
-         <View style={[
-           styles.statusBadge,
-           { backgroundColor: getStatusColor(item.status) }
-         ]}>
-           <Ionicons 
-             name={getStatusIcon(item.status)} 
-             size={16} 
-             color="white" 
-           />
-           <Text style={styles.statusText}>
-             {getStatusText(item.status)}
-           </Text>
-         </View>
-       </View>
+    <View style={styles.routeCard}>
+      {/* User Header */}
+      <View style={styles.userHeader}>
+        <View style={styles.userAvatar}>
+          <Text style={styles.userInitial}>
+            {item.userName?.charAt(0)?.toUpperCase() || 'U'}
+          </Text>
+        </View>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.userName}</Text>
+          <Text style={styles.userContact}>{item.userPhone} • {item.userEmail}</Text>
+          <View style={styles.userDetails}>
+            <Text style={styles.userDetailText}>
+              Aadhaar: {item.userAadhaar} • Role: {item.userRole}
+            </Text>
+            <Text style={styles.userDetailText}>
+              Status: {item.userIsActive ? 'Active' : 'Inactive'} • Family: {item.userFamilyMembers?.length || 0}
+            </Text>
+          </View>
+        </View>
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: getStatusColor(item.status) }
+        ]}>
+          <Ionicons 
+            name={getStatusIcon(item.status)} 
+            size={14} 
+            color="white" 
+          />
+          <Text style={styles.statusText}>
+            {getStatusText(item.status)}
+          </Text>
+        </View>
+      </View>
 
       {/* Hospital Information */}
-      <View style={styles.hospitalInfo}>
+      <View style={styles.hospitalSection}>
         <View style={styles.hospitalHeader}>
+          <Ionicons name="business" size={20} color="#20B2AA" />
+          <Text style={styles.hospitalLabel}>Destination Hospital</Text>
+        </View>
+        <View style={styles.hospitalInfo}>
           <View style={[
             styles.hospitalTypeBadge,
             { backgroundColor: getHospitalTypeColor(item.hospitalType) }
           ]}>
             <Ionicons 
               name={getHospitalTypeIcon(item.hospitalType)} 
-              size={16} 
+              size={14} 
               color="white" 
             />
             <Text style={styles.hospitalTypeText}>
@@ -164,120 +178,141 @@ export default function UsersComingScreen() {
         </View>
       </View>
 
-             {/* Route Details */}
-       <View style={styles.routeDetails}>
-         <View style={styles.routePoint}>
-           <Ionicons name="location" size={16} color="#28a745" />
-           <Text style={styles.routePointText}>
-             Start: {item.startLatitude.toFixed(4)}, {item.startLongitude.toFixed(4)}
-           </Text>
-         </View>
-         <View style={styles.routePoint}>
-           <Ionicons name="location" size={16} color="#dc3545" />
-           <Text style={styles.routePointText}>
-             Destination: {item.endLatitude.toFixed(4)}, {item.endLongitude.toFixed(4)}
-           </Text>
-         </View>
-         <View style={styles.routePoint}>
-           <Ionicons name="map-outline" size={16} color="#007AFF" />
-           <Text style={styles.routePointText}>
-             Route Points: {item.routePoints.length} waypoints
-           </Text>
-         </View>
-       </View>
+      {/* Route Information */}
+      <View style={styles.routeSection}>
+        <View style={styles.routeHeader}>
+          <Ionicons name="navigate" size={20} color="#20B2AA" />
+          <Text style={styles.routeLabel}>Route Information</Text>
+        </View>
+        <View style={styles.routeDetails}>
+          <View style={styles.routePoint}>
+            <Ionicons name="location" size={16} color="#32CD32" />
+            <Text style={styles.routePointText}>
+              Start: {item.startLatitude.toFixed(4)}, {item.startLongitude.toFixed(4)}
+            </Text>
+          </View>
+          <View style={styles.routePoint}>
+            <Ionicons name="location" size={16} color="#E74C3C" />
+            <Text style={styles.routePointText}>
+              Destination: {item.endLatitude.toFixed(4)}, {item.endLongitude.toFixed(4)}
+            </Text>
+          </View>
+          <View style={styles.routePoint}>
+            <Ionicons name="map-outline" size={16} color="#20B2AA" />
+            <Text style={styles.routePointText}>
+              Waypoints: {item.routePoints.length} points
+            </Text>
+          </View>
+        </View>
+      </View>
 
-             {/* Distance and Time */}
-       <View style={styles.metricsContainer}>
-         <View style={styles.metric}>
-           <Ionicons name="map" size={16} color="#007AFF" />
-           <Text style={styles.metricText}>
-             {item.distance.toFixed(1)} km
-           </Text>
-         </View>
-         <View style={styles.metric}>
-           <Ionicons name="time" size={16} color="#FF6B6B" />
-           <Text style={styles.metricText}>
-             {item.estimatedTime} min
-           </Text>
-         </View>
-         <View style={styles.metric}>
-           <Ionicons name="calendar" size={16} color="#6c757d" />
-           <Text style={styles.metricText}>
-             {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Today'}
-           </Text>
-         </View>
-       </View>
+      {/* Metrics */}
+      <View style={styles.metricsSection}>
+        <View style={styles.metricsGrid}>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIcon}>
+              <Ionicons name="map" size={20} color="#20B2AA" />
+            </View>
+            <Text style={styles.metricValue}>{item.distance.toFixed(1)} km</Text>
+            <Text style={styles.metricLabel}>Distance</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIcon}>
+              <Ionicons name="time" size={20} color="#FFA500" />
+            </View>
+            <Text style={styles.metricValue}>{item.estimatedTime} min</Text>
+            <Text style={styles.metricLabel}>ETA</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <View style={styles.metricIcon}>
+              <Ionicons name="calendar" size={20} color="#7F8C8D" />
+            </View>
+            <Text style={styles.metricValue}>
+              {item.createdAt?.toDate?.()?.toLocaleDateString() || 'Today'}
+            </Text>
+            <Text style={styles.metricLabel}>Created</Text>
+          </View>
+        </View>
+      </View>
 
-       {/* User Registration Info */}
-       <View style={styles.userRegistrationInfo}>
-         <View style={styles.registrationItem}>
-           <Ionicons name="person-add" size={14} color="#666" />
-           <Text style={styles.registrationText}>
-             Registered: {item.userCreatedAt?.toDate?.()?.toLocaleDateString() || 'Unknown'}
-           </Text>
-         </View>
-         <View style={styles.registrationItem}>
-           <Ionicons name="time" size={14} color="#666" />
-           <Text style={styles.registrationText}>
-             Last Seen: {item.userLastSeen?.toDate?.()?.toLocaleDateString() || 'Unknown'}
-           </Text>
-         </View>
-       </View>
+      {/* User Registration Info */}
+      <View style={styles.registrationSection}>
+        <View style={styles.registrationGrid}>
+          <View style={styles.registrationItem}>
+            <Ionicons name="person-add" size={14} color="#20B2AA" />
+            <Text style={styles.registrationText}>
+              Registered: {item.userCreatedAt?.toDate?.()?.toLocaleDateString() || 'Unknown'}
+            </Text>
+          </View>
+          <View style={styles.registrationItem}>
+            <Ionicons name="time" size={14} color="#20B2AA" />
+            <Text style={styles.registrationText}>
+              Last Seen: {item.userLastSeen?.toDate?.()?.toLocaleDateString() || 'Unknown'}
+            </Text>
+          </View>
+        </View>
+      </View>
 
-       {/* Family Members Info */}
-       {item.userFamilyMembers && item.userFamilyMembers.length > 0 && (
-         <View style={styles.familyMembersInfo}>
-           <Ionicons name="people" size={16} color="#007AFF" />
-           <Text style={styles.familyMembersText}>
-             Family Members: {item.userFamilyMembers.length} connected
-           </Text>
-         </View>
-       )}
+      {/* Family Members Info */}
+      {item.userFamilyMembers && item.userFamilyMembers.length > 0 && (
+        <View style={styles.familySection}>
+          <View style={styles.familyHeader}>
+            <Ionicons name="people" size={16} color="#20B2AA" />
+            <Text style={styles.familyLabel}>Family Members</Text>
+          </View>
+          <Text style={styles.familyText}>
+            {item.userFamilyMembers.length} family members connected
+          </Text>
+        </View>
+      )}
 
       {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.viewRouteButton]}
-          onPress={() => handleShowRoute(item)}
-        >
-          <Ionicons name="map" size={16} color="white" />
-          <Text style={styles.actionButtonText}>View Route</Text>
-        </TouchableOpacity>
+      <View style={styles.actionSection}>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.viewRouteButton]}
+            onPress={() => handleShowRoute(item)}
+          >
+            <Ionicons name="map" size={16} color="white" />
+            <Text style={styles.actionButtonText}>View Route</Text>
+          </TouchableOpacity>
 
-        {item.status === 'active' && (
-          <>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.completeButton]}
-              onPress={() => handleUpdateStatus(item.id!, 'completed')}
-            >
-              <Ionicons name="checkmark" size={16} color="white" />
-              <Text style={styles.actionButtonText}>Mark Arrived</Text>
-            </TouchableOpacity>
+          {item.status === 'active' && (
+            <>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.completeButton]}
+                onPress={() => handleUpdateStatus(item.id!, 'completed')}
+              >
+                <Ionicons name="checkmark" size={16} color="white" />
+                <Text style={styles.actionButtonText}>Mark Arrived</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton]}
-              onPress={() => handleUpdateStatus(item.id!, 'cancelled')}
-            >
-              <Ionicons name="close" size={16} color="white" />
-              <Text style={styles.actionButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </>
-        )}
+              <TouchableOpacity
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => handleUpdateStatus(item.id!, 'cancelled')}
+              >
+                <Ionicons name="close" size={16} color="white" />
+                <Text style={styles.actionButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
 
+        {/* Status Info */}
         {item.status === 'completed' && (
-          <View style={styles.completedInfo}>
-            <Ionicons name="checkmark-circle" size={16} color="#28a745" />
-            <Text style={styles.completedText}>
-              Arrived at {item.completedAt?.toDate?.()?.toLocaleTimeString() || 'recently'}
+          <View style={styles.statusInfo}>
+            <Ionicons name="checkmark-circle" size={16} color="#32CD32" />
+            <Text style={styles.statusInfoText}>
+              Arrived at {item.completedAt?.toLocaleTimeString() || 'recently'}
             </Text>
           </View>
         )}
 
         {item.status === 'cancelled' && (
-          <View style={styles.cancelledInfo}>
-            <Ionicons name="close-circle" size={16} color="#dc3545" />
-            <Text style={styles.cancelledText}>
-              Cancelled at {item.cancelledAt?.toDate?.()?.toLocaleTimeString() || 'recently'}
+          <View style={styles.statusInfo}>
+            <Ionicons name="close-circle" size={16} color="#E74C3C" />
+            <Text style={styles.statusInfoText}>
+              Cancelled at {item.cancelledAt?.toLocaleTimeString() || 'recently'}
             </Text>
           </View>
         )}
@@ -290,10 +325,9 @@ export default function UsersComingScreen() {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Users Coming to Hospitals</Text>
-          <Text style={styles.headerSubtitle}>Track user routes and arrivals</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B6B" />
+          <ActivityIndicator size="large" color="#20B2AA" />
           <Text style={styles.loadingText}>Loading user routes...</Text>
         </View>
       </View>
@@ -304,13 +338,21 @@ export default function UsersComingScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Users Coming to Hospitals</Text>
-        <Text style={styles.headerSubtitle}>Track user routes and arrivals</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>Users Coming to Hospitals</Text>
+            <Text style={styles.headerSubtitle}>Track user routes and arrivals</Text>
+          </View>
+          <View style={styles.statusIndicator}>
+            <View style={styles.statusDot} />
+            <Text style={styles.headerStatusText}>LIVE</Text>
+          </View>
+        </View>
       </View>
 
       {/* Filter Buttons */}
       <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
           <TouchableOpacity
             style={[
               styles.filterButton,
@@ -384,13 +426,15 @@ export default function UsersComingScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#FF6B6B']}
-            tintColor="#FF6B6B"
+            colors={['#20B2AA']}
+            tintColor="#20B2AA"
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="navigate-outline" size={64} color="#ccc" />
+            <View style={styles.emptyIcon}>
+              <Ionicons name="navigate-outline" size={48} color="#BDC3C7" />
+            </View>
             <Text style={styles.emptyText}>No user routes found</Text>
             <Text style={styles.emptySubtext}>
               {selectedFilter === 'all' 
@@ -408,53 +452,114 @@ export default function UsersComingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F0F8FF',
   },
   header: {
-    backgroundColor: '#FF6B6B',
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 30,
     paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerInfo: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#2C3E50',
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    color: '#7F8C8D',
+    fontWeight: '500',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    marginRight: 6,
+  },
+  headerStatusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   filterContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterScroll: {
+    paddingHorizontal: 20,
   },
   filterButton: {
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginHorizontal: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    marginRight: 12,
+    backgroundColor: '#F0F8FF',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E8F4FD',
   },
   filterButtonActive: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
+    backgroundColor: '#20B2AA',
+    borderColor: '#20B2AA',
   },
   filterButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#7F8C8D',
   },
   filterButtonTextActive: {
-    color: 'white',
+    color: '#FFFFFF',
   },
   listContainer: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -465,64 +570,94 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#7F8C8D',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
   },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0F8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   emptyText: {
     fontSize: 18,
-    color: '#666',
-    marginTop: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    color: '#7F8C8D',
     textAlign: 'center',
+    lineHeight: 20,
   },
-  routeItem: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  routeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    marginHorizontal: 4,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  routeHeader: {
+  userHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  userAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#20B2AA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  userInitial: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   userInfo: {
     flex: 1,
-    marginRight: 10,
   },
   userName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#2C3E50',
     marginBottom: 4,
   },
   userContact: {
     fontSize: 14,
-    color: '#666',
+    color: '#7F8C8D',
+    marginBottom: 8,
   },
   userDetails: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
+    gap: 2,
+  },
+  userDetailText: {
+    fontSize: 11,
+    color: '#7F8C8D',
+    flexWrap: 'wrap',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     gap: 4,
@@ -530,12 +665,23 @@ const styles = StyleSheet.create({
   statusText: {
     color: 'white',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  hospitalInfo: {
-    marginBottom: 16,
+  hospitalSection: {
+    marginBottom: 20,
   },
   hospitalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  hospitalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginLeft: 8,
+  },
+  hospitalInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -543,61 +689,99 @@ const styles = StyleSheet.create({
   hospitalTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     gap: 4,
   },
   hospitalTypeText: {
     color: 'white',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   hospitalName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#2C3E50',
     flex: 1,
   },
+  routeSection: {
+    marginBottom: 20,
+  },
+  routeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  routeLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginLeft: 8,
+  },
   routeDetails: {
-    marginBottom: 16,
+    gap: 8,
   },
   routePoint: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
     gap: 8,
   },
   routePointText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#7F8C8D',
     flex: 1,
+    flexWrap: 'wrap',
   },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+  metricsSection: {
+    marginBottom: 20,
   },
-  metric: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  metricText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  userRegistrationInfo: {
+  metricsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    flexWrap: 'wrap',
+  },
+  metricCard: {
+    flex: 1,
+    backgroundColor: '#F0F8FF',
+    padding: 12,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginHorizontal: 2,
+    minWidth: (width - 60) / 3, // Responsive width
+  },
+  metricIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  metricValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  metricLabel: {
+    fontSize: 10,
+    color: '#7F8C8D',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  registrationSection: {
+    marginBottom: 20,
+  },
+  registrationGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F0F8FF',
+    padding: 12,
+    borderRadius: 16,
+    flexWrap: 'wrap',
   },
   registrationItem: {
     flexDirection: 'row',
@@ -605,77 +789,88 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   registrationText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 11,
+    color: '#7F8C8D',
+    flex: 1,
+    flexWrap: 'wrap',
   },
-  familyMembersInfo: {
+  familySection: {
+    backgroundColor: '#F0F8FF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+  },
+  familyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-    gap: 8,
+    marginBottom: 8,
   },
-  familyMembersText: {
-    fontSize: 12,
-    color: '#1976d2',
-    fontWeight: '500',
+  familyLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginLeft: 8,
+  },
+  familyText: {
+    fontSize: 14,
+    color: '#7F8C8D',
+  },
+  actionSection: {
+    gap: 12,
   },
   actionButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    justifyContent: 'flex-start',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 16,
-    gap: 6,
+    borderRadius: 20,
+    gap: 4,
+    minWidth: 100,
+    flex: 1,
+    maxWidth: (width - 80) / 3, // Responsive width based on screen size
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   viewRouteButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#20B2AA',
   },
   completeButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#32CD32',
   },
   cancelButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#E74C3C',
   },
   actionButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    flex: 1,
+  },
+  statusInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 16,
+  },
+  statusInfoText: {
+    fontSize: 14,
+    color: '#2C3E50',
     fontWeight: '600',
-  },
-  completedInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#d4edda',
-    borderRadius: 8,
-  },
-  completedText: {
-    fontSize: 14,
-    color: '#155724',
-    fontWeight: '500',
-  },
-  cancelledInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#f8d7da',
-    borderRadius: 8,
-  },
-  cancelledText: {
-    fontSize: 14,
-    color: '#721c24',
-    fontWeight: '500',
   },
 });

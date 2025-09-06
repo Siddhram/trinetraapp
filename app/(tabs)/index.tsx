@@ -1,26 +1,146 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
 import {
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Dimensions,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
+import { auth, db } from '../../lib/firebase';
 
 const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const router = useRouter();
+  const [selectedCategory, setSelectedCategory] = useState('Just for you');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+
+  const [onlineFamilyCount, setOnlineFamilyCount] = useState(0);
+
+  useEffect(() => {
+    fetchOnlineFamilyCount();
+  }, []);
+
+  const fetchOnlineFamilyCount = async () => {
+    try {
+      if (auth.currentUser) {
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          const familyMembers = userData.familyMembers || [];
+          // Count family members who are currently online (you can add online status logic here)
+          setOnlineFamilyCount(familyMembers.length);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching family count:', error);
+    }
+  };
+
+  const userServices = [
+    { 
+      id: 1, 
+      name: 'Family Tracking', 
+      description: 'Track family members', 
+      image: '👨‍👩‍👧‍👦', 
+      time: '24/7', 
+      route: '/(tabs)/map',
+      color: '#4CAF50'
+    },
+    { 
+      id: 2, 
+      name: 'Emergency Help', 
+      description: 'Get immediate help', 
+      image: '🚨', 
+      time: '24/7', 
+      route: '/(tabs)/medical',
+      color: '#F44336'
+    },
+    { 
+      id: 3, 
+      name: 'Ambulance Request', 
+      description: 'Request ambulance', 
+      image: '🚑', 
+      time: '24/7', 
+      route: '/user-ambulance-request',
+      color: '#FF9800'
+    },
+    { 
+      id: 4, 
+      name: 'Online Family', 
+      description: `${onlineFamilyCount} members online`, 
+      image: '👥', 
+      time: 'Live', 
+      route: '/(tabs)/explore',
+      color: '#2196F3'
+    },
+    { 
+      id: 5, 
+      name: 'Family Alerts', 
+      description: 'Family notifications', 
+      image: '🔔', 
+      time: 'Live', 
+      route: '/(tabs)/explore',
+      color: '#9C27B0'
+    },
+    { 
+      id: 6, 
+      name: 'Missing Person', 
+      description: 'Find lost people', 
+      image: '🔍', 
+      time: 'Live', 
+      route: '/(tabs)/missing-person',
+      color: '#FF5722'
+    },
+    { 
+      id: 7, 
+      name: 'Trinetra', 
+      description: 'AI assistance', 
+      image: '🤖', 
+      time: '24/7', 
+      route: '/(tabs)/trinetra-webview',
+      color: '#795548'
+    },
+    { 
+      id: 8, 
+      name: 'Emergency Offline', 
+      description: '24/7 Emergency Service', 
+      image: '🚨', 
+      time: 'Live', 
+      route: '/emergency-offline-service',
+      color: '#E91E63'
+    },
+    { 
+      id: 9, 
+      name: 'Profile', 
+      description: 'Manage your account', 
+      image: '👤', 
+      time: 'Settings', 
+      route: '/profile',
+      color: '#607D8B'
+    },
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
-      {/* Header Section */}
+      {/* Header Section - Keep existing */}
       <View style={styles.header}>
         <View style={styles.locationSection}>
           <Text style={styles.locationIcon}>📍</Text>
@@ -35,188 +155,82 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Welcome Banner */}
-        <View style={styles.welcomeBanner}>
-          <View style={styles.bannerContent}>
-            <Text style={styles.bannerTitle}>🕉️ Mahakumbh 2025</Text>
-            <Text style={styles.bannerSubtitle}>Welcome to the Sacred Gathering</Text>
-            <Text style={styles.bannerDescription}>Experience the divine at the world's largest spiritual event</Text>
+        {/* User Greeting Section */}
+        <View style={styles.greetingSection}>
+          <View style={styles.greetingLeft}>
+            <View style={styles.profileImage}>
+              <Ionicons name="person" size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.greetingText}>
+              <Text style={styles.greetingName}>Hey, Devotee</Text>
+              <Text style={styles.greetingTime}>{getGreeting()}</Text>
+            </View>
           </View>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color="#000000" />
+          </TouchableOpacity>
         </View>
 
-        {/* Category Navigation */}
-        <View style={styles.categorySection}>
-          <Text style={styles.sectionTitle}>Sacred Services</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-            <View style={styles.categoryContainer}>
-              <TouchableOpacity style={styles.categoryItem}>
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.categoryEmoji}>🏛️</Text>
-                </View>
-                <Text style={styles.categoryText}>Ghats</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.categoryItem}>
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.categoryEmoji}>🍽️</Text>
-                </View>
-                <Text style={styles.categoryText}>Food</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.categoryItem}>
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.categoryEmoji}>🏥</Text>
-                </View>
-                <Text style={styles.categoryText}>Medical</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.categoryItem}>
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.categoryEmoji}>🔍</Text>
-                </View>
-                <Text style={styles.categoryText}>Lost & Found</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.categoryItem}>
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.categoryEmoji}>🚌</Text>
-                </View>
-                <Text style={styles.categoryText}>Transport</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.categoryItem}>
-                <View style={styles.categoryIcon}>
-                  <Text style={styles.categoryEmoji}>🏨</Text>
-                </View>
-                <Text style={styles.categoryText}>Accommodation</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+        {/* Search Bar */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={20} color="#999999" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search services..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity style={styles.filterButton}>
+              <Ionicons name="options-outline" size={20} color="#999999" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Promotional Banner */}
         <View style={styles.promoBanner}>
           <View style={styles.promoContent}>
-            <Text style={styles.promoTitle}>🌟 Sacred Rituals Today</Text>
-            <Text style={styles.promoSubtitle}>Join the morning aarti at 6:00 AM</Text>
-            <Text style={styles.promoDescription}>Experience the divine sunrise ceremony at Sangam Ghat</Text>
-          </View>
-          <View style={styles.promoIcon}>
-            <Text style={styles.promoEmoji}>🌅</Text>
-          </View>
-        </View>
-
-        {/* Featured Events */}
-        <View style={styles.featuredSection}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Sacred Events</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>See all</Text>
+            <Text style={styles.promoTitle}>Hurry Up! Get 20% off</Text>
+            <Text style={styles.promoSubtitle}>Sacred Services Everyday</Text>
+            <Text style={styles.promoBrand}>Mahakumbh 2025</Text>
+            <TouchableOpacity style={styles.shopNowButton}>
+              <Text style={styles.shopNowText}>Explore Now</Text>
             </TouchableOpacity>
           </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.eventScroll}>
-            <View style={styles.eventContainer}>
-              <TouchableOpacity style={styles.eventCard}>
-                <View style={styles.eventImage}>
-                  <Text style={styles.eventEmoji}>🕉️</Text>
-                </View>
-                <Text style={styles.eventPrice}>Free</Text>
-                <Text style={styles.eventName}>Morning Aarti</Text>
-                <Text style={styles.eventTime}>6:00 AM - 7:00 AM</Text>
-                <TouchableOpacity style={styles.addButton}>
-                  <Text style={styles.addButtonText}>+</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.eventCard}>
-                <View style={styles.eventImage}>
-                  <Text style={styles.eventEmoji}>🙏</Text>
-                </View>
-                <Text style={styles.eventPrice}>Free</Text>
-                <Text style={styles.eventName}>Sacred Bathing</Text>
-                <Text style={styles.eventTime}>7:00 AM - 9:00 AM</Text>
-                <TouchableOpacity style={styles.addButton}>
-                  <Text style={styles.addButtonText}>+</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.eventCard}>
-                <View style={styles.eventImage}>
-                  <Text style={styles.eventEmoji}>🕯️</Text>
-                </View>
-                <Text style={styles.eventPrice}>Free</Text>
-                <Text style={styles.eventName}>Evening Puja</Text>
-                <Text style={styles.eventTime}>6:00 PM - 7:00 PM</Text>
-                <TouchableOpacity style={styles.addButton}>
-                  <Text style={styles.addButtonText}>+</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
+          <View style={styles.promoImage}>
+            <Text style={styles.promoEmoji}>ॐ
+            </Text>
+          </View>
         </View>
 
-        {/* Nearby Services */}
+
+        {/* User Services Grid */}
         <View style={styles.servicesSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Nearby Services</Text>
+            <Text style={styles.sectionTitle}>My Services</Text>
             <TouchableOpacity>
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
           </View>
           
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.serviceScroll}>
-            <View style={styles.serviceContainer}>
-              <TouchableOpacity style={styles.serviceCard}>
-                <View style={styles.serviceLogo}>
-                  <Text style={styles.serviceEmoji}>🏥</Text>
+          <View style={styles.servicesGrid}>
+            {userServices.map((service) => (
+              <TouchableOpacity 
+                key={service.id} 
+                style={styles.serviceCard}
+                onPress={() => router.push(service.route as any)}
+              >
+                <View style={[styles.serviceIconContainer, { backgroundColor: service.color + '20' }]}>
+                  <Text style={styles.serviceIcon}>{service.image}</Text>
                 </View>
-                <Text style={styles.serviceName}>Medical Aid Center</Text>
-                <Text style={styles.serviceDistance}>0.2 km away</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.serviceCard}>
-                <View style={styles.serviceLogo}>
-                  <Text style={styles.serviceEmoji}>🍽️</Text>
+                <Text style={styles.serviceName}>{service.name}</Text>
+                <Text style={styles.serviceDescription}>{service.description}</Text>
+                <View style={styles.serviceFooter}>
+                  <Text style={[styles.serviceTime, { color: service.color }]}>{service.time}</Text>
+                  <Ionicons name="arrow-forward" size={16} color={service.color} />
                 </View>
-                <Text style={styles.serviceName}>Langar Hall</Text>
-                <Text style={styles.serviceDistance}>0.1 km away</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.serviceCard}>
-                <View style={styles.serviceLogo}>
-                  <Text style={styles.serviceEmoji}>🚌</Text>
-                </View>
-                <Text style={styles.serviceName}>Shuttle Service</Text>
-                <Text style={styles.serviceDistance}>0.3 km away</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickActionCard}>
-              <Text style={styles.quickActionEmoji}>🚨</Text>
-              <Text style={styles.quickActionText}>Emergency</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionCard}>
-              <Text style={styles.quickActionEmoji}>🔍</Text>
-              <Text style={styles.quickActionText}>Find Person</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionCard}>
-              <Text style={styles.quickActionEmoji}>📍</Text>
-              <Text style={styles.quickActionText}>My Location</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickActionCard}>
-              <Text style={styles.quickActionEmoji}>📞</Text>
-              <Text style={styles.quickActionText}>Help Center</Text>
-            </TouchableOpacity>
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -229,12 +243,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  // Keep existing header styles
   header: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingTop: 0,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
@@ -254,11 +270,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
     textAlign: 'center',
-  },
-  dropdownIcon: {
-    fontSize: 12,
-    color: '#000000',
-    marginLeft: 8,
   },
   profileButton: {
     position: 'absolute',
@@ -287,11 +298,84 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  welcomeBanner: {
-    backgroundColor: '#FF8C00',
-    margin: 20,
+  // New greeting section
+  greetingSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    marginRight: 0,
+  },
+  greetingLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    padding: 24,
+    backgroundColor: '#FF8C00',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  greetingText: {
+    flex: 1,
+  },
+  greetingName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  greetingTime: {
+    fontSize: 14,
+    color: '#666666',
+  },
+  notificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+    flexShrink: 0,
+  },
+  // Search section
+  searchSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#000000',
+  },
+  filterButton: {
+    marginLeft: 12,
+  },
+  // Promotional banner
+  promoBanner: {
+    backgroundColor: '#FF8C00',
+    marginHorizontal: 20,
+    marginBottom: 24,
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#FF8C00',
     shadowOffset: {
       width: 0,
@@ -301,110 +385,49 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  bannerContent: {
-    flex: 1,
-  },
-  bannerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  bannerSubtitle: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    marginBottom: 4,
-  },
-  bannerDescription: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  categorySection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginHorizontal: 20,
-    marginBottom: 16,
-  },
-  categoryScroll: {
-    paddingLeft: 20,
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    paddingRight: 20,
-  },
-  categoryItem: {
-    alignItems: 'center',
-    marginRight: 20,
-    width: 70,
-  },
-  categoryIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-  },
-  categoryEmoji: {
-    fontSize: 24,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#000000',
-    textAlign: 'center',
-  },
-  promoBanner: {
-    backgroundColor: '#F8F9FA',
-    marginHorizontal: 20,
-    marginBottom: 24,
-    borderRadius: 16,
-    padding: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
   promoContent: {
     flex: 1,
   },
   promoTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   promoSubtitle: {
-    fontSize: 14,
-    color: '#FF8C00',
-    fontWeight: '600',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 4,
   },
-  promoDescription: {
-    fontSize: 12,
-    color: '#666666',
+  promoBrand: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 16,
   },
-  promoIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FF8C00',
+  shopNowButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  shopNowText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF8C00',
+  },
+  promoImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 16,
   },
   promoEmoji: {
-    fontSize: 24,
-  },
-  featuredSection: {
-    marginBottom: 24,
+    color: '#FFFFFF',
+    fontSize: 40,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -413,147 +436,31 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 16,
   },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+  },
   seeAllText: {
     fontSize: 14,
     color: '#FF8C00',
     fontWeight: '600',
   },
-  eventScroll: {
-    paddingLeft: 20,
-  },
-  eventContainer: {
-    flexDirection: 'row',
-    paddingRight: 20,
-  },
-  eventCard: {
-    width: 160,
-    marginRight: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  eventImage: {
-    width: '100%',
-    height: 80,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  eventEmoji: {
-    fontSize: 32,
-  },
-  eventPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FF8C00',
-    marginBottom: 4,
-  },
-  eventName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-    marginBottom: 2,
-  },
-  eventTime: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 8,
-  },
-  addButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FF8C00',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
+  // Services section
   servicesSection: {
-    marginBottom: 24,
-  },
-  serviceScroll: {
-    paddingLeft: 20,
-  },
-  serviceContainer: {
-    flexDirection: 'row',
-    paddingRight: 20,
-  },
-  serviceCard: {
-    width: 140,
-    marginRight: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  serviceLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  serviceEmoji: {
-    fontSize: 24,
-  },
-  serviceName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  serviceDistance: {
-    fontSize: 12,
-    color: '#666666',
-    textAlign: 'center',
-  },
-  quickActionsSection: {
     marginBottom: 24,
     paddingHorizontal: 20,
   },
-  quickActionsGrid: {
+  servicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  quickActionCard: {
+  serviceCard: {
     width: (width - 60) / 2,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 16,
     shadowColor: '#000000',
     shadowOffset: {
@@ -561,19 +468,44 @@ const styles = StyleSheet.create({
       height: 2,
     },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#F5F5F5',
   },
-  quickActionEmoji: {
-    fontSize: 32,
-    marginBottom: 8,
+  serviceIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    alignSelf: 'center',
   },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
+  serviceIcon: {
+    fontSize: 24,
+    color: '#FFFFFF',
+  },
+  serviceName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 4,
     textAlign: 'center',
+  },
+  serviceDescription: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  serviceFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  serviceTime: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

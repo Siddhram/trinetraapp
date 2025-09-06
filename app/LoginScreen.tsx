@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
 import { useState } from 'react';
 import { Dimensions, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { auth, db } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,19 +23,8 @@ export default function LoginScreen() {
     setErrorMsg('');
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Fetch user role from Firestore
-      const userDoc = await getDoc(doc(db, 'users', userCredential.user.uid));
-      const userData = userDoc.exists() ? userDoc.data() : {};
-      
-      // Navigate based on user role
-      if (userData.role === 'medicalAdmin') {
-        router.push('/(medicalAdminTabs)');
-      } else if (userData.role === 'admin') {
-        router.push('/(adminTabs)');
-      } else {
-        router.push('/(tabs)');
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      // Navigation will be handled automatically by _layout.tsx based on user role
     } catch (error) {
       setErrorMsg((error as any).message || 'Login failed');
     } finally {

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
     FlatList,
     RefreshControl,
     ScrollView,
@@ -13,13 +14,15 @@ import {
 } from 'react-native';
 import FirebaseService, { AmbulanceRequest } from '../../lib/firebaseService';
 
+const { width } = Dimensions.get('window');
+
 const getStatusColor = (status: AmbulanceRequest['status']) => {
   switch (status) {
-    case 'pending': return '#ffc107';
-    case 'accepted': return '#28a745';
-    case 'completed': return '#6c757d';
-    case 'cancelled': return '#dc3545';
-    default: return '#6c757d';
+    case 'pending': return '#FFA500';
+    case 'accepted': return '#20B2AA';
+    case 'completed': return '#32CD32';
+    case 'cancelled': return '#E74C3C';
+    default: return '#7F8C8D';
   }
 };
 
@@ -153,8 +156,14 @@ export default function MedicalAdminAmbulanceRequests() {
   });
 
   const renderRequestItem = ({ item }: { item: AmbulanceRequest }) => (
-    <View style={styles.requestItem}>
-      <View style={styles.requestHeader}>
+    <View style={styles.requestCard}>
+      {/* Patient Header */}
+      <View style={styles.patientHeader}>
+        <View style={styles.patientAvatar}>
+          <Text style={styles.patientInitial}>
+            {item.patientName?.charAt(0)?.toUpperCase() || 'P'}
+          </Text>
+        </View>
         <View style={styles.patientInfo}>
           <Text style={styles.patientName}>{item.patientName}</Text>
           <Text style={styles.patientPhone}>{item.patientPhone}</Text>
@@ -165,7 +174,7 @@ export default function MedicalAdminAmbulanceRequests() {
         ]}>
           <Ionicons 
             name={getStatusIcon(item.status)} 
-            size={16} 
+            size={14} 
             color="white" 
           />
           <Text style={styles.statusText}>
@@ -174,9 +183,10 @@ export default function MedicalAdminAmbulanceRequests() {
         </View>
       </View>
 
-      <View style={styles.emergencyInfo}>
-        <View style={styles.emergencyType}>
-          <Ionicons name="medical" size={16} color="#dc3545" />
+      {/* Emergency Details */}
+      <View style={styles.emergencySection}>
+        <View style={styles.emergencyHeader}>
+          <Ionicons name="medical" size={20} color="#E74C3C" />
           <Text style={styles.emergencyTypeText}>{item.emergencyType}</Text>
         </View>
         {item.description && (
@@ -184,65 +194,75 @@ export default function MedicalAdminAmbulanceRequests() {
         )}
       </View>
 
-      <View style={styles.locationInfo}>
-        <Ionicons name="location" size={16} color="#666" />
+      {/* Location Info */}
+      <View style={styles.locationSection}>
+        <Ionicons name="location" size={16} color="#20B2AA" />
         <Text style={styles.locationText}>
           {item.patientAddress || `${item.latitude ? item.latitude.toFixed(4) : '0.0000'}, ${item.longitude ? item.longitude.toFixed(4) : '0.0000'}`}
         </Text>
       </View>
 
+      {/* Hospital Info (if accepted) */}
       {item.status === 'accepted' && item.hospitalName && (
-        <View style={styles.hospitalInfo}>
-          <Ionicons name="business" size={16} color="#28a745" />
-          <Text style={styles.hospitalText}>
-            Accepted by: {item.hospitalName}
-          </Text>
-          {item.estimatedTime && (
-            <Text style={styles.timeText}>
-              ETA: {item.estimatedTime} minutes
-            </Text>
-          )}
-          {item.distance && (
-            <Text style={styles.distanceText}>
-              Distance: {item.distance ? item.distance.toFixed(1) : '0.0'} km
-            </Text>
-          )}
+        <View style={styles.hospitalSection}>
+          <View style={styles.hospitalHeader}>
+            <Ionicons name="business" size={16} color="#20B2AA" />
+            <Text style={styles.hospitalLabel}>Assigned Hospital</Text>
+          </View>
+          <Text style={styles.hospitalName}>{item.hospitalName}</Text>
+          <View style={styles.hospitalDetails}>
+            {item.estimatedTime && (
+              <View style={styles.detailItem}>
+                <Ionicons name="time" size={14} color="#7F8C8D" />
+                <Text style={styles.detailText}>ETA: {item.estimatedTime} min</Text>
+              </View>
+            )}
+            {item.distance && (
+              <View style={styles.detailItem}>
+                <Ionicons name="navigate" size={14} color="#7F8C8D" />
+                <Text style={styles.detailText}>{item.distance.toFixed(1)} km</Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
 
-      <View style={styles.actionButtons}>
-        {item.status === 'pending' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.acceptButton]}
-            onPress={() => handleAcceptRequest(item)}
-          >
-            <Ionicons name="checkmark" size={16} color="white" />
-            <Text style={styles.actionButtonText}>Accept</Text>
-          </TouchableOpacity>
-        )}
+      {/* Action Buttons */}
+      <View style={styles.actionSection}>
+        <View style={styles.actionButtons}>
+          {item.status === 'pending' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.acceptButton]}
+              onPress={() => handleAcceptRequest(item)}
+            >
+              <Ionicons name="checkmark" size={16} color="white" />
+              <Text style={styles.actionButtonText}>Accept</Text>
+            </TouchableOpacity>
+          )}
 
-        {item.status === 'accepted' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.completeButton]}
-            onPress={() => handleCompleteRequest(item)}
-          >
-            <Ionicons name="checkmark-done" size={16} color="white" />
-            <Text style={styles.actionButtonText}>Complete</Text>
-          </TouchableOpacity>
-        )}
+          {item.status === 'accepted' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.completeButton]}
+              onPress={() => handleCompleteRequest(item)}
+            >
+              <Ionicons name="checkmark-done" size={16} color="white" />
+              <Text style={styles.actionButtonText}>Complete</Text>
+            </TouchableOpacity>
+          )}
 
-        {item.status === 'pending' && (
-          <TouchableOpacity
-            style={[styles.actionButton, styles.cancelButton]}
-            onPress={() => handleCancelRequest(item)}
-          >
-            <Ionicons name="close" size={16} color="white" />
-            <Text style={styles.actionButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        )}
-
+          {item.status === 'pending' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton]}
+              onPress={() => handleCancelRequest(item)}
+            >
+              <Ionicons name="close" size={16} color="white" />
+              <Text style={styles.actionButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        
         <View style={styles.timestamp}>
-          <Ionicons name="time" size={14} color="#999" />
+          <Ionicons name="time" size={12} color="#7F8C8D" />
           <Text style={styles.timestampText}>
             {item.createdAt?.toDate?.()?.toLocaleString() || 'Just now'}
           </Text>
@@ -258,7 +278,7 @@ export default function MedicalAdminAmbulanceRequests() {
           <Text style={styles.headerTitle}>Ambulance Requests</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B6B" />
+          <ActivityIndicator size="large" color="#20B2AA" />
           <Text style={styles.loadingText}>Loading ambulance requests...</Text>
         </View>
       </View>
@@ -269,8 +289,16 @@ export default function MedicalAdminAmbulanceRequests() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Ambulance Requests</Text>
-        <Text style={styles.headerSubtitle}>Manage emergency ambulance requests</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>Ambulance Requests</Text>
+            <Text style={styles.headerSubtitle}>Emergency Response Management</Text>
+          </View>
+          <View style={styles.statusIndicator}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>LIVE</Text>
+          </View>
+        </View>
       </View>
 
       {/* Filter Tabs */}
@@ -308,16 +336,18 @@ export default function MedicalAdminAmbulanceRequests() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#FF6B6B']}
-            tintColor="#FF6B6B"
+            colors={['#20B2AA']}
+            tintColor="#20B2AA"
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="medical-outline" size={64} color="#ccc" />
+            <View style={styles.emptyIcon}>
+              <Ionicons name="medical-outline" size={48} color="#BDC3C7" />
+            </View>
             <Text style={styles.emptyText}>No ambulance requests found</Text>
             <Text style={styles.emptySubtext}>
-              {filter === 'all' ? 'New requests will appear here when submitted' : `No ${filter} requests found`}
+              {filter === 'all' ? 'New emergency requests will appear here' : `No ${filter} requests found`}
             </Text>
           </View>
         }
@@ -329,56 +359,114 @@ export default function MedicalAdminAmbulanceRequests() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F0F8FF',
   },
   header: {
-    backgroundColor: '#FF6B6B',
-    padding: 20,
-    paddingTop: 60,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 30,
     paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerInfo: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#2C3E50',
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    color: '#7F8C8D',
+    fontWeight: '500',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   filterContainer: {
-    backgroundColor: 'white',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   filterScroll: {
     paddingHorizontal: 20,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 10,
-    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
+    marginRight: 12,
+    backgroundColor: '#F0F8FF',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#E8F4FD',
   },
   filterButtonActive: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF6B6B',
+    backgroundColor: '#20B2AA',
+    borderColor: '#20B2AA',
   },
   filterButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#7F8C8D',
   },
   filterButtonTextActive: {
-    color: 'white',
+    color: '#FFFFFF',
   },
   listContainer: {
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -389,157 +477,205 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#7F8C8D',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
   },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F0F8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   emptyText: {
     fontSize: 18,
-    color: '#666',
-    marginTop: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    color: '#7F8C8D',
     textAlign: 'center',
+    lineHeight: 20,
   },
-  requestItem: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+  requestCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  requestHeader: {
+  patientHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  patientAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#20B2AA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  patientInitial: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   patientInfo: {
     flex: 1,
-    marginRight: 10,
   },
   patientName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: '#2C3E50',
+    marginBottom: 2,
   },
   patientPhone: {
     fontSize: 14,
-    color: '#666',
+    color: '#7F8C8D',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     gap: 4,
   },
-  statusText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+  emergencySection: {
+    marginBottom: 16,
   },
-  emergencyInfo: {
-    marginBottom: 12,
-  },
-  emergencyType: {
+  emergencyHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    gap: 8,
   },
   emergencyTypeText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#dc3545',
+    fontWeight: 'bold',
+    color: '#E74C3C',
+    marginLeft: 8,
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: '#7F8C8D',
     fontStyle: 'italic',
+    lineHeight: 20,
   },
-  locationInfo: {
+  locationSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
+    marginBottom: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
   },
   locationText: {
     fontSize: 14,
-    color: '#666',
+    color: '#2C3E50',
+    marginLeft: 8,
+    flex: 1,
   },
-  hospitalInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+  hospitalSection: {
+    backgroundColor: '#F0F8FF',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
   },
-  hospitalText: {
+  hospitalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  hospitalLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#28a745',
+    color: '#20B2AA',
     marginLeft: 8,
   },
-  timeText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 24,
-    marginTop: 4,
+  hospitalName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 8,
   },
-  distanceText: {
+  hospitalDetails: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
     fontSize: 12,
-    color: '#666',
-    marginLeft: 24,
-    marginTop: 2,
+    color: '#7F8C8D',
+    marginLeft: 4,
+  },
+  actionSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   actionButtons: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    alignItems: 'center',
+    gap: 12,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
     gap: 6,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   acceptButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#20B2AA',
   },
   completeButton: {
-    backgroundColor: '#6c757d',
+    backgroundColor: '#32CD32',
   },
   cancelButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#E74C3C',
   },
   actionButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   timestamp: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 'auto',
     gap: 4,
   },
   timestampText: {
     fontSize: 12,
-    color: '#999',
+    color: '#7F8C8D',
   },
 });

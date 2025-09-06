@@ -2,8 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../lib/firebase';
+
+const { width } = Dimensions.get('window');
 
 interface UserProfile {
   name: string;
@@ -62,8 +64,14 @@ export default function MedicalAdminProfile() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Loading profile...</Text>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profile</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#20B2AA" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
       </View>
     );
   }
@@ -72,8 +80,16 @@ export default function MedicalAdminProfile() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <Text style={styles.headerSubtitle}>Medical Admin Account</Text>
+        <View style={styles.headerContent}>
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <Text style={styles.headerSubtitle}>Medical Admin Account</Text>
+          </View>
+          <View style={styles.statusIndicator}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>ACTIVE</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -81,112 +97,140 @@ export default function MedicalAdminProfile() {
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={40} color="#FF6B6B" />
+              <Ionicons name="person" size={50} color="#FFFFFF" />
             </View>
             <View style={styles.roleBadge}>
+              <Ionicons name="medical" size={16} color="#FFFFFF" />
               <Text style={styles.roleText}>Medical Admin</Text>
             </View>
           </View>
           
           <Text style={styles.userName}>{profile?.name || 'Loading...'}</Text>
           <Text style={styles.userEmail}>{profile?.email || 'Loading...'}</Text>
+          <View style={styles.profileStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>Admin</Text>
+              <Text style={styles.statLabel}>Role</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>Active</Text>
+              <Text style={styles.statLabel}>Status</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>
+                {profile?.createdAt?.toDate?.()?.toLocaleDateString()?.split('/')[2] || '2024'}
+              </Text>
+              <Text style={styles.statLabel}>Since</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Profile Information */}
+        {/* Account Information */}
         <View style={styles.infoSection}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="person-circle" size={24} color="#20B2AA" />
+            <Text style={styles.sectionTitle}>Account Information</Text>
+          </View>
           
-          <View style={styles.infoItem}>
-            <Ionicons name="person-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{profile?.name || 'Not available'}</Text>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Ionicons name="person-outline" size={20} color="#20B2AA" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Full Name</Text>
+                <Text style={styles.infoValue}>{profile?.name || 'Not available'}</Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.infoItem}>
-            <Ionicons name="mail-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{profile?.email || 'Not available'}</Text>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Ionicons name="mail-outline" size={20} color="#20B2AA" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Email</Text>
+                <Text style={styles.infoValue}>{profile?.email || 'Not available'}</Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.infoItem}>
-            <Ionicons name="call-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Phone</Text>
-              <Text style={styles.infoValue}>{profile?.phone || 'Not available'}</Text>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Ionicons name="call-outline" size={20} color="#20B2AA" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Phone</Text>
+                <Text style={styles.infoValue}>{profile?.phone || 'Not available'}</Text>
+              </View>
             </View>
-          </View>
 
-          <View style={styles.infoItem}>
-            <Ionicons name="card-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Aadhaar</Text>
-              <Text style={styles.infoValue}>{profile?.aadhaar || 'Not available'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Ionicons name="shield-checkmark-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Role</Text>
-              <Text style={styles.infoValue}>Medical Admin</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoItem}>
-            <Ionicons name="calendar-outline" size={20} color="#666" />
-            <View style={styles.infoContent}>
-              <Text style={styles.infoLabel}>Member Since</Text>
-              <Text style={styles.infoValue}>
-                {profile?.createdAt?.toDate?.()?.toLocaleDateString() || 'Not available'}
-              </Text>
+            <View style={styles.infoItem}>
+              <View style={styles.infoIcon}>
+                <Ionicons name="card-outline" size={20} color="#20B2AA" />
+              </View>
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Aadhaar</Text>
+                <Text style={styles.infoValue}>{profile?.aadhaar || 'Not available'}</Text>
+              </View>
             </View>
           </View>
         </View>
 
         {/* Medical Admin Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Medical Admin Features</Text>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="medical" size={24} color="#20B2AA" />
+            <Text style={styles.sectionTitle}>Medical Admin Features</Text>
+          </View>
           
-          <View style={styles.featureItem}>
-            <Ionicons name="medical" size={24} color="#FF6B6B" />
-            <View style={styles.featureContent}>
+          <View style={styles.featuresGrid}>
+            <View style={styles.featureCard}>
+              <View style={styles.featureIcon}>
+                <Ionicons name="medical" size={24} color="#20B2AA" />
+              </View>
               <Text style={styles.featureTitle}>Ambulance Requests</Text>
-              <Text style={styles.featureDescription}>Manage and respond to emergency ambulance requests</Text>
+              <Text style={styles.featureDescription}>Manage emergency requests</Text>
             </View>
-          </View>
 
-          <View style={styles.featureItem}>
-            <Ionicons name="people" size={24} color="#28a745" />
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Users Coming to Hospital</Text>
-              <Text style={styles.featureDescription}>Track users en route to the hospital</Text>
+            <View style={styles.featureCard}>
+              <View style={styles.featureIcon}>
+                <Ionicons name="people" size={24} color="#20B2AA" />
+              </View>
+              <Text style={styles.featureTitle}>Users Coming</Text>
+              <Text style={styles.featureDescription}>Track hospital routes</Text>
             </View>
-          </View>
 
-          <View style={styles.featureItem}>
-            <Ionicons name="analytics" size={24} color="#007AFF" />
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Dashboard Analytics</Text>
-              <Text style={styles.featureDescription}>View real-time statistics and reports</Text>
+            <View style={styles.featureCard}>
+              <View style={styles.featureIcon}>
+                <Ionicons name="analytics" size={24} color="#20B2AA" />
+              </View>
+              <Text style={styles.featureTitle}>Analytics</Text>
+              <Text style={styles.featureDescription}>View real-time stats</Text>
             </View>
           </View>
         </View>
 
-        {/* Actions */}
+        {/* Quick Actions */}
         <View style={styles.actionsSection}>
-          <TouchableOpacity style={styles.actionButton} onPress={loadProfile}>
-            <Ionicons name="refresh" size={20} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Refresh Profile</Text>
-          </TouchableOpacity>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="settings" size={24} color="#20B2AA" />
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+          </View>
+          
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity style={styles.actionCard} onPress={loadProfile}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="refresh" size={24} color="#20B2AA" />
+              </View>
+              <Text style={styles.actionTitle}>Refresh Profile</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, styles.signOutButton]} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={20} color="#dc3545" />
-            <Text style={[styles.actionButtonText, styles.signOutButtonText]}>Sign Out</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionCard, styles.signOutCard]} onPress={handleSignOut}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="log-out-outline" size={24} color="#E74C3C" />
+              </View>
+              <Text style={[styles.actionTitle, styles.signOutText]}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -196,181 +240,315 @@ export default function MedicalAdminProfile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F0F8FF',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   loadingText: {
+    marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#7F8C8D',
   },
   header: {
-    backgroundColor: '#FF6B6B',
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    marginBottom: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerInfo: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#2C3E50',
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 16,
+    color: '#7F8C8D',
+    fontWeight: '500',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#20B2AA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    marginRight: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   content: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   profileCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: '#20B2AA',
+    borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    marginBottom: 24,
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#f8f9fa',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
   roleBadge: {
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
   roleText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
   userName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: '#FFFFFF',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   userEmail: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  profileStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 16,
+    borderRadius: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   infoSection: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    marginBottom: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
+    color: '#2C3E50',
+    marginLeft: 8,
+  },
+  infoGrid: {
+    gap: 16,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#F0F8FF',
+    padding: 16,
+    borderRadius: 16,
+  },
+  infoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   infoContent: {
     flex: 1,
-    marginLeft: 12,
   },
   infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
+    fontSize: 12,
+    color: '#7F8C8D',
+    marginBottom: 4,
+    fontWeight: '600',
   },
   infoValue: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#2C3E50',
   },
   featuresSection: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    marginBottom: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  featureItem: {
+  featuresGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  featureContent: {
-    flex: 1,
-    marginLeft: 12,
+  featureCard: {
+    width: (width - 60) / 3,
+    backgroundColor: '#F0F8FF',
+    padding: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  featureIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 2,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   featureDescription: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 10,
+    color: '#7F8C8D',
+    textAlign: 'center',
   },
   actionsSection: {
     marginBottom: 30,
   },
-  actionButton: {
+  actionsGrid: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    borderRadius: 20,
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    marginHorizontal: 6,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginLeft: 12,
+  actionIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F0F8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  signOutButton: {
-    backgroundColor: '#fff5f5',
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    textAlign: 'center',
   },
-  signOutButtonText: {
-    color: '#dc3545',
+  signOutCard: {
+    backgroundColor: '#FFF5F5',
+  },
+  signOutText: {
+    color: '#E74C3C',
   },
 });
 

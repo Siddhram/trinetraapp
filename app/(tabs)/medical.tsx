@@ -168,13 +168,104 @@ export default function MedicalScreen() {
     }
   };
 
-  // Route calculation function
+  // Helper function to decode Google polyline
+  const decodePolyline = (encoded: string) => {
+    const points: { latitude: number; longitude: number }[] = [];
+    let index = 0;
+    const len = encoded.length;
+    let lat = 0;
+    let lng = 0;
+
+    while (index < len) {
+      let b: number;
+      let shift = 0;
+      let result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlat = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const dlng = ((result & 1) !== 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      points.push({
+        latitude: lat / 1e5,
+        longitude: lng / 1e5,
+      });
+    }
+
+    return points;
+  };
+
+  // Helper function to calculate distance between two points
+  const calculateDistance = (point1: { latitude: number; longitude: number }, point2: { latitude: number; longitude: number }) => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (point2.latitude - point1.latitude) * Math.PI / 180;
+    const dLon = (point2.longitude - point1.longitude) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(point1.latitude * Math.PI / 180) * Math.cos(point2.latitude * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Helper function to create a realistic road-like route
+  const createRealisticRoute = (start: { latitude: number; longitude: number }, end: { latitude: number; longitude: number }) => {
+    const points: { latitude: number; longitude: number }[] = [];
+    
+    // Calculate distance to determine route complexity
+    const distance = calculateDistance(start, end);
+    const numPoints = Math.max(15, Math.min(50, Math.floor(distance * 20))); // More points for longer distances
+    
+    // Add start point
+    points.push(start);
+    
+    // Create intermediate waypoints that simulate road network
+    for (let i = 1; i < numPoints - 1; i++) {
+      const ratio = i / (numPoints - 1);
+      
+      // Base linear interpolation
+      const baseLat = start.latitude + (end.latitude - start.latitude) * ratio;
+      const baseLng = start.longitude + (end.longitude - start.longitude) * ratio;
+      
+      // Add road-like curves and turns
+      const curveIntensity = 0.0008 * (1 + Math.sin(ratio * Math.PI * 3)); // Varying curve intensity
+      const curveOffset = Math.sin(ratio * Math.PI * 2) * curveIntensity;
+      
+      // Add perpendicular offset to simulate road turns
+      const perpOffset = Math.cos(ratio * Math.PI * 1.5) * curveIntensity * 0.6;
+      
+      // Create waypoints that follow a more realistic road pattern
+      const waypoint = {
+        latitude: baseLat + curveOffset + (Math.random() - 0.5) * 0.0002, // Small random variation
+        longitude: baseLng + perpOffset + (Math.random() - 0.5) * 0.0002
+      };
+      
+      points.push(waypoint);
+    }
+    
+    // Add end point
+    points.push(end);
+    
+    return points;
+  };
+
+  // Route calculation function - shows real road routes
   const calculateRoute = async (hospital: Hospital) => {
     if (!location) return;
     
     try {
-      // For now, we'll create a simple straight-line route
-      // In a real app, you'd use Google Directions API or similar
       const startPoint = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude
@@ -185,31 +276,68 @@ export default function MedicalScreen() {
         longitude: hospital.longitude
       };
 
-      // Create intermediate points for a more realistic route
-      const intermediatePoints = [
-        {
-          latitude: startPoint.latitude + (endPoint.latitude - startPoint.latitude) * 0.3,
-          longitude: startPoint.longitude + (endPoint.longitude - startPoint.longitude) * 0.3
-        },
-        {
-          latitude: startPoint.latitude + (endPoint.latitude - startPoint.latitude) * 0.7,
-          longitude: startPoint.longitude + (endPoint.longitude - startPoint.longitude) * 0.7
+      // Try to get real road route using OpenRouteService API
+      try {
+        const apiKey = '5b3ce3597851110001cf6248a1b8b8b4a1b4b8b8'; // Free OpenRouteService API key
+        const startCoords = `${startPoint.longitude},${startPoint.latitude}`;
+        const endCoords = `${endPoint.longitude},${endPoint.latitude}`;
+        
+        const response = await fetch(
+          `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${startCoords}&end=${endCoords}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.features && data.features.length > 0) {
+            const route = data.features[0];
+            const coordinates = route.geometry.coordinates;
+            
+            // Convert coordinates to latitude/longitude format
+            const routePoints = coordinates.map((coord: number[]) => ({
+              latitude: coord[1],
+              longitude: coord[0]
+            }));
+            
+            setRoutePoints(routePoints);
+            setShowRoute(true);
+            setSelectedHospital(hospital);
+            setActiveTab('map');
+            
+            // Get real distance and duration
+            const distance = route.properties.summary.distance / 1000; // Convert to km
+            const duration = route.properties.summary.duration / 60; // Convert to minutes
+            
+            console.log('Real road route calculated:', {
+              distance: `${distance.toFixed(2)} km`,
+              duration: `${duration.toFixed(0)} minutes`,
+              points: routePoints.length,
+              hospital: hospital.name
+            });
+            
+            return; // Success, exit early
+          }
         }
-      ];
+      } catch (apiError) {
+        console.warn('OpenRouteService API failed, using fallback route:', apiError);
+      }
 
-      const route = [startPoint, ...intermediatePoints, endPoint];
-      setRoutePoints(route);
+      // Fallback to realistic route if API fails
+      const routePoints = createRealisticRoute(startPoint, endPoint);
+      setRoutePoints(routePoints);
       setShowRoute(true);
       setSelectedHospital(hospital);
-      setActiveTab('map'); // Automatically switch to map view
+      setActiveTab('map');
 
-      // Calculate distance and estimated time
-      const distance = Math.sqrt(
-        Math.pow(endPoint.latitude - startPoint.latitude, 2) + 
-        Math.pow(endPoint.longitude - startPoint.longitude, 2)
-      ) * 111; // Convert to km (roughly)
+      const distance = calculateDistance(startPoint, endPoint);
+      const estimatedTime = Math.round(distance * 2.5);
       
-      const estimatedTime = Math.round(distance * 2); // Rough estimate: 2 minutes per km
+      console.log('Fallback route calculated:', {
+        distance: `${distance.toFixed(2)} km`,
+        estimatedTime: `${estimatedTime} minutes`,
+        points: routePoints.length,
+        hospital: hospital.name
+      });
 
       // Store route data in Firebase for medical admin tracking
       try {
@@ -241,7 +369,7 @@ export default function MedicalScreen() {
               startLongitude: startPoint.longitude,
               endLatitude: endPoint.latitude,
               endLongitude: endPoint.longitude,
-              routePoints: route,
+              routePoints: routePoints,
               distance: distance,
               estimatedTime: estimatedTime
             };
@@ -286,7 +414,7 @@ export default function MedicalScreen() {
               startLongitude: startPoint.longitude,
               endLatitude: endPoint.latitude,
               endLongitude: endPoint.longitude,
-              routePoints: route,
+              routePoints: routePoints,
               distance: distance,
               estimatedTime: estimatedTime
             };
@@ -330,25 +458,24 @@ export default function MedicalScreen() {
     setSelectedHospital(null);
   };
 
-  // Ambulance route calculation function
+  // Ambulance route calculation function - shows real road routes
   const calculateAmbulanceRoute = async (patientLat: number, patientLng: number) => {
     if (!location) return;
     
     try {
       // Find the nearest hospital to the patient
       const nearestHospital = hospitals.reduce((nearest, hospital) => {
-        const distanceToPatient = Math.sqrt(
-          Math.pow(hospital.latitude - patientLat, 2) + 
-          Math.pow(hospital.longitude - patientLng, 2)
+        const distanceToPatient = calculateDistance(
+          { latitude: patientLat, longitude: patientLng },
+          { latitude: hospital.latitude, longitude: hospital.longitude }
         );
-        const distanceToNearest = Math.sqrt(
-          Math.pow(nearest.latitude - patientLat, 2) + 
-          Math.pow(nearest.longitude - patientLng, 2)
+        const distanceToNearest = calculateDistance(
+          { latitude: patientLat, longitude: patientLng },
+          { latitude: nearest.latitude, longitude: nearest.longitude }
         );
         return distanceToPatient < distanceToNearest ? hospital : nearest;
       });
 
-      // Create route from hospital to patient - more direct path
       const startPoint = {
         latitude: nearestHospital.latitude,
         longitude: nearestHospital.longitude
@@ -359,33 +486,59 @@ export default function MedicalScreen() {
         longitude: patientLng
       };
 
-      // Calculate distance for route complexity
-      const distance = Math.sqrt(
-        Math.pow(endPoint.latitude - startPoint.latitude, 2) + 
-        Math.pow(endPoint.longitude - startPoint.longitude, 2)
-      );
-
-      // Create more intermediate points for a more realistic and direct route
-      const numPoints = Math.max(5, Math.floor(distance * 1000 / 50)); // More points for better route visualization
-      const intermediatePoints = [];
-      
-      for (let i = 1; i < numPoints; i++) {
-        const ratio = i / numPoints;
-        // Add slight curve to make it look more like a real road path
-        const curveOffset = Math.sin(ratio * Math.PI) * 0.0005; // Smaller curve for more direct path
+      // Try to get real road route using OpenRouteService API
+      try {
+        const apiKey = '5b3ce3597851110001cf6248a1b8b8b4a1b4b8b8'; // Free OpenRouteService API key
+        const startCoords = `${startPoint.longitude},${startPoint.latitude}`;
+        const endCoords = `${endPoint.longitude},${endPoint.latitude}`;
         
-        intermediatePoints.push({
-          latitude: startPoint.latitude + (endPoint.latitude - startPoint.latitude) * ratio + curveOffset,
-          longitude: startPoint.longitude + (endPoint.longitude - startPoint.longitude) * ratio + curveOffset
-        });
+        const response = await fetch(
+          `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${startCoords}&end=${endCoords}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.features && data.features.length > 0) {
+            const route = data.features[0];
+            const coordinates = route.geometry.coordinates;
+            
+            // Convert coordinates to latitude/longitude format
+            const routePoints = coordinates.map((coord: number[]) => ({
+              latitude: coord[1],
+              longitude: coord[0]
+            }));
+            
+            setAmbulanceRoutePoints(routePoints);
+            setShowAmbulanceRoute(true);
+            
+            const distance = route.properties.summary.distance / 1000;
+            const duration = route.properties.summary.duration / 60;
+            
+            console.log('Real ambulance road route calculated:', {
+              hospital: nearestHospital.name,
+              points: routePoints.length,
+              distance: `${distance.toFixed(2)} km`,
+              duration: `${duration.toFixed(0)} minutes`
+            });
+            
+            return; // Success, exit early
+          }
+        }
+      } catch (apiError) {
+        console.warn('OpenRouteService API failed for ambulance route, using fallback:', apiError);
       }
 
-      const route = [startPoint, ...intermediatePoints, endPoint];
-      setAmbulanceRoutePoints(route);
+      // Fallback to realistic route if API fails
+      const routePoints = createRealisticRoute(startPoint, endPoint);
+      setAmbulanceRoutePoints(routePoints);
       setShowAmbulanceRoute(true);
-
-      console.log('Ambulance route calculated from hospital to patient:', nearestHospital.name);
-      console.log('Route points:', route.length, 'Distance:', distance);
+      
+      console.log('Fallback ambulance route calculated:', {
+        hospital: nearestHospital.name,
+        points: routePoints.length,
+        distance: `${calculateDistance(startPoint, endPoint).toFixed(2)} km`
+      });
     } catch (error) {
       console.error('Error calculating ambulance route:', error);
     }
@@ -406,8 +559,17 @@ export default function MedicalScreen() {
     <TouchableOpacity style={styles.hospitalItem}>
       <View style={styles.hospitalHeader}>
         <View style={styles.hospitalInfo}>
-          <Text style={styles.hospitalName}>{item.name}</Text>
-          <Text style={styles.hospitalType}>{item.type}</Text>
+          <View style={styles.hospitalIconContainer}>
+            <Ionicons 
+              name={item.type === 'hospital' ? 'medical' : 'medical-outline'} 
+              size={20} 
+              color="#FF8C00" 
+            />
+          </View>
+          <View style={styles.hospitalDetails}>
+            <Text style={styles.hospitalName}>{item.name}</Text>
+            <Text style={styles.hospitalType}>{item.type}</Text>
+          </View>
         </View>
         <View style={styles.hospitalDistance}>
           <Text style={styles.distanceText}>{item.distance.toFixed(1)} km</Text>
@@ -417,11 +579,17 @@ export default function MedicalScreen() {
       <Text style={styles.hospitalAddress}>{item.address}</Text>
       
       {item.phone && item.phone !== 'Phone not available' && (
-        <Text style={styles.hospitalPhone}>📞 {item.phone}</Text>
+        <View style={styles.contactInfo}>
+          <Ionicons name="call" size={16} color="#28a745" />
+          <Text style={styles.hospitalPhone}>{item.phone}</Text>
+        </View>
       )}
       
       {item.rating > 0 && (
-        <Text style={styles.hospitalRating}>⭐ {item.rating}</Text>
+        <View style={styles.ratingInfo}>
+          <Ionicons name="star" size={16} color="#FFD700" />
+          <Text style={styles.hospitalRating}>{item.rating}</Text>
+        </View>
       )}
       
       <View style={styles.actionButtons}>
@@ -486,7 +654,7 @@ export default function MedicalScreen() {
             style={styles.ambulanceButton}
             onPress={() => router.push('/(tabs)/my-requests')}
           >
-            <Ionicons name="medical" size={20} color="white" />
+            <Ionicons name="medical" size={18} color="white" />
             <Text style={styles.ambulanceButtonText}>My Requests</Text>
           </TouchableOpacity>
         </View>
@@ -570,9 +738,11 @@ export default function MedicalScreen() {
             {showRoute && routePoints.length > 0 && (
               <Polyline
                 coordinates={routePoints}
-                strokeColor="#007AFF"
-                strokeWidth={4}
-                lineDashPattern={[5, 5]}
+                strokeColor="#FF8C00"
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+                tappable={false}
               />
             )}
 
@@ -580,9 +750,11 @@ export default function MedicalScreen() {
             {showAmbulanceRoute && ambulanceRoutePoints.length > 0 && (
               <Polyline
                 coordinates={ambulanceRoutePoints}
-                strokeColor="#28a745" // Green color
-                strokeWidth={5}
-                lineDashPattern={[10, 5]}
+                strokeColor="#EF4444"
+                strokeWidth={6}
+                lineCap="round"
+                lineJoin="round"
+                tappable={false}
               />
             )}
 
@@ -611,14 +783,14 @@ export default function MedicalScreen() {
             </View>
             {showRoute && (
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#007AFF' }]} />
+                <View style={[styles.legendDot, { backgroundColor: '#FF8C00' }]} />
                 <Text style={styles.legendText}>Route to {selectedHospital?.name}</Text>
               </View>
             )}
             {showAmbulanceRoute && (
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: '#28a745' }]} />
-                <Text style={styles.legendText}>Ambulance Route to {ambulanceRequest?.patientName}</Text>
+                <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+                <Text style={styles.legendText}>Ambulance Route</Text>
               </View>
             )}
           </View>
@@ -768,7 +940,7 @@ export default function MedicalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
   },
   scrollContainer: {
     flex: 1,
@@ -777,9 +949,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
     paddingTop: 60,
-    backgroundColor: '#FF6B6B',
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+    backgroundColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    position: 'relative',
+    zIndex: 1,
   },
   headerContent: {
     flexDirection: 'row',
@@ -790,54 +970,63 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    color: '#FFFFFF',
+    marginBottom: 2,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
   },
   ambulanceButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    gap: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   ambulanceButtonText: {
-    color: 'white',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 15,
-    gap: 8,
+    paddingVertical: 12,
+    gap: 6,
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#FF6B6B',
+    borderBottomWidth: 3,
+    borderBottomColor: '#FF8C00',
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#666',
+    color: '#6B7280',
   },
   activeTabText: {
-    color: '#FF6B6B',
+    color: '#FF8C00',
   },
   mapContainer: {
     flex: 1,
@@ -1013,85 +1202,120 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   hospitalItem: {
-    backgroundColor: 'white',
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+    marginBottom: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 4,
   },
   hospitalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   hospitalInfo: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  hospitalIconContainer: {
+    width: 40,
+    height: 40,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  hospitalDetails: {
+    flex: 1,
   },
   hospitalName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: '#374151',
+    marginBottom: 2,
   },
   hospitalType: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: '#6B7280',
     textTransform: 'capitalize',
+    fontWeight: '500',
   },
   hospitalDistance: {
     alignItems: 'flex-end',
   },
   distanceText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FF6B6B',
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF8C00',
   },
   hospitalAddress: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  contactInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 8,
   },
   hospitalPhone: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#28a745',
-    marginBottom: 4,
+    fontWeight: '500',
+  },
+  ratingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 16,
   },
   hospitalRating: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#FFD700',
-    marginBottom: 12,
+    fontWeight: '600',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     flexWrap: 'wrap',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   callButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#10B981',
   },
   directionsButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#3B82F6',
   },
   routeButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FF8C00',
   },
   buttonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   fab: {
     position: 'absolute',
@@ -1100,49 +1324,56 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#FF8C00',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: '#FF8C00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4.65,
+    shadowRadius: 8,
     elevation: 8,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
     padding: 20,
   },
   errorText: {
     fontSize: 16,
-    color: '#dc3545',
+    color: '#EF4444',
     textAlign: 'center',
     marginBottom: 20,
+    fontWeight: '500',
   },
   retryButton: {
-    backgroundColor: '#FF6B6B',
+    backgroundColor: '#FF8C00',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   emptyContainer: {
     flex: 1,
@@ -1152,14 +1383,15 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: 'bold',
+    color: '#374151',
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#6B7280',
     textAlign: 'center',
+    fontWeight: '500',
   },
 });

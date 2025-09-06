@@ -1,19 +1,24 @@
-import { Video } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
+import { ResizeMode, Video } from 'expo-av';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
 
 interface DetectionResult {
   success: boolean;
@@ -136,8 +141,8 @@ export default function FaceDetectionAnalysisScreen() {
 
       console.log('Sending request to face detection API...');
       
-      // Replace with your server IP - the user mentioned server is on another network
-      const response = await fetch('http://35.154.222.142:5001/api/detect', {
+      // Use the same server for both analysis and download
+      const response = await fetch('http://172.20.10.4:5003/api/detect', {
         method: 'POST',
         body: formData,
         headers: {
@@ -163,7 +168,8 @@ export default function FaceDetectionAnalysisScreen() {
 
     } catch (error) {
       console.error('Face detection error:', error);
-      Alert.alert('Error', `Face detection failed: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert('Error', `Face detection failed: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -189,7 +195,7 @@ export default function FaceDetectionAnalysisScreen() {
           });
           setDownloadProgress(`Video downloaded successfully`);
         } else {
-          setDownloadProgress(`Failed to download video: ${detectionData.output_video}`);
+          setDownloadProgress(`Failed to download video: ${detectionData.output_video}. Check server connectivity.`);
         }
       }
 
@@ -205,7 +211,7 @@ export default function FaceDetectionAnalysisScreen() {
           });
           setDownloadProgress(`Image downloaded successfully`);
         } else {
-          setDownloadProgress(`Failed to download image: ${detectionData.detection_frame}`);
+          setDownloadProgress(`Failed to download image: ${detectionData.detection_frame}. Check server connectivity.`);
         }
       }
 
@@ -221,34 +227,50 @@ export default function FaceDetectionAnalysisScreen() {
   };
 
   const downloadFileWithRetry = async (filename: string, fileType: 'video' | 'image', maxRetries: number = 3): Promise<string | null> => {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Download attempt ${attempt}/${maxRetries} for ${filename}`);
-        const result = await downloadFile(filename, fileType);
-        if (result) {
-          return result;
+    const servers = [
+      // Cloud server
+      'http://172.20.10.4:5003', // Local server fallback
+    ];
+    
+    for (const server of servers) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`Download attempt ${attempt}/${maxRetries} for ${filename} from ${server}`);
+          const result = await downloadFileFromServer(filename, fileType, server);
+          if (result) {
+            return result;
+          }
+        } catch (error) {
+          console.error(`Download attempt ${attempt} failed for ${filename} from ${server}:`, error);
+          if (attempt === maxRetries) {
+            console.log(`All attempts failed for ${server}, trying next server...`);
+            break; // Try next server
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
         }
-      } catch (error) {
-        console.error(`Download attempt ${attempt} failed for ${filename}:`, error);
-        if (attempt === maxRetries) {
-          throw error;
-        }
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       }
     }
+    
+    console.error(`All download attempts failed for ${filename}`);
     return null;
   };
 
-  const downloadFile = async (filename: string, fileType: 'video' | 'image'): Promise<string | null> => {
+  const downloadFileFromServer = async (filename: string, fileType: 'video' | 'image', serverUrl: string): Promise<string | null> => {
     try {
-      console.log(`Downloading ${fileType}: ${filename}`);
+      console.log(`Downloading ${fileType}: ${filename} from ${serverUrl}`);
       
       // Add timeout and better error handling
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => {
+        console.error(`Download timeout for ${filename} from ${serverUrl}`);
+        controller.abort();
+      }, 120000); // 2 minute timeout for large files
       
-      const response = await fetch(`http://35.154.222.142:5001/api/download/${filename}`, {
+      const downloadUrl = `${serverUrl}/api/download/${filename}`;
+      console.log(`Download URL: ${downloadUrl}`);
+      
+      const response = await fetch(downloadUrl, {
         signal: controller.signal,
         headers: {
           'Accept': fileType === 'video' ? 'video/mp4,video/*' : 'image/*,*/*',
@@ -257,17 +279,27 @@ export default function FaceDetectionAnalysisScreen() {
       
       clearTimeout(timeoutId);
       
+      console.log(`Response status: ${response.status} ${response.statusText}`);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Download failed: ${response.status} ${response.statusText}`, errorText);
         throw new Error(`Download failed: ${response.status} ${response.statusText}`);
       }
 
       // Check content type
       const contentType = response.headers.get('content-type');
+      const contentLength = response.headers.get('content-length');
       console.log(`Content type for ${filename}: ${contentType}`);
+      console.log(`Content length for ${filename}: ${contentLength} bytes`);
 
       // Get the file as blob
       const blob = await response.blob();
       console.log(`Downloaded ${filename}: ${blob.size} bytes`);
+      
+      if (blob.size === 0) {
+        throw new Error('Downloaded file is empty');
+      }
       
       // Convert blob to base64 for display
       return new Promise((resolve, reject) => {
@@ -285,13 +317,19 @@ export default function FaceDetectionAnalysisScreen() {
       });
 
     } catch (error) {
-      if (error.name === 'AbortError') {
-        console.error(`Download timeout for ${filename}`);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error(`Download timeout for ${filename} from ${serverUrl}`);
+        throw new Error(`Download timeout for ${filename}`);
       } else {
-        console.error(`Error downloading ${filename}:`, error);
+        console.error(`Error downloading ${filename} from ${serverUrl}:`, error);
+        throw error;
       }
-      return null;
     }
+  };
+
+  // Keep the old function for backward compatibility
+  const downloadFile = async (filename: string, fileType: 'video' | 'image'): Promise<string | null> => {
+    return downloadFileFromServer(filename, fileType, 'http://35.154.222.142:5001');
   };
 
   const resetAnalysis = () => {
@@ -302,479 +340,1044 @@ export default function FaceDetectionAnalysisScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Face Detection Analysis</Text>
-      </View>
-
-      {!result ? (
-        <View style={styles.content}>
-          {/* Person Image Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>1. Select Person Image</Text>
-            {personImage ? (
-              <View style={styles.imageContainer}>
-                <Image source={{ uri: personImage }} style={styles.previewImage} />
-                <TouchableOpacity onPress={pickPersonImage} style={styles.changeButton}>
-                  <Text style={styles.changeButtonText}>Change Image</Text>
-                </TouchableOpacity>
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Professional Header */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Ionicons name="arrow-back" size={24} color="#FF8C00" />
+            </TouchableOpacity>
+            <View style={styles.titleContainer}>
+              <View style={styles.iconContainer}>
+                <Ionicons name="eye" size={20} color="#FFFFFF" />
               </View>
-            ) : (
-              <TouchableOpacity onPress={pickPersonImage} style={styles.selectButton}>
-                <Text style={styles.selectButtonText}>Select Person Image</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Crowd Video Selection */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>2. Select Crowd Video</Text>
-            {crowdVideo ? (
-              <View style={styles.videoContainer}>
-                <Text style={styles.videoText}>Video selected ✓</Text>
-                <TouchableOpacity onPress={pickCrowdVideo} style={styles.changeButton}>
-                  <Text style={styles.changeButtonText}>Change Video</Text>
-                </TouchableOpacity>
+              <View style={styles.titleTextContainer}>
+                <Text style={styles.title}>Face Detection Analysis</Text>
+                <Text style={styles.subtitle}>Find missing persons in crowd videos</Text>
               </View>
-            ) : (
-              <TouchableOpacity onPress={pickCrowdVideo} style={styles.selectButton}>
-                <Text style={styles.selectButtonText}>Select Crowd Video</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Parameters */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>3. Detection Parameters</Text>
-            <View style={styles.parameterRow}>
-              <Text style={styles.parameterLabel}>Tolerance (0.0-1.0):</Text>
-              <TextInput
-                style={styles.parameterInput}
-                value={tolerance}
-                onChangeText={setTolerance}
-                keyboardType="numeric"
-                placeholder="0.6"
-              />
             </View>
-            <View style={styles.parameterRow}>
-              <Text style={styles.parameterLabel}>Frame Skip:</Text>
-              <TextInput
-                style={styles.parameterInput}
-                value={frameSkip}
-                onChangeText={setFrameSkip}
-                keyboardType="numeric"
-                placeholder="5"
-              />
+            <View style={styles.statusBadge}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>LIVE</Text>
             </View>
           </View>
-
-          {/* Analyze Button */}
-          <TouchableOpacity
-            onPress={analyzeFaceDetection}
-            style={[styles.analyzeButton, loading && styles.analyzeButtonDisabled]}
-            disabled={loading || !personImage || !crowdVideo}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.analyzeButtonText}>Analyze Face Detection</Text>
-            )}
-          </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.resultContainer}>
-          <Text style={styles.resultTitle}>Analysis Results</Text>
-          
-          {result.success ? (
-            <View style={styles.successContainer}>
-              <Text style={styles.successText}>✓ {result.message}</Text>
+
+        {!result ? (
+          <View style={styles.content}>
+            {/* Person Image Selection */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconContainer}>
+                  <Ionicons name="person" size={20} color="#FF8C00" />
+                </View>
+                <View style={styles.sectionTitleContainer}>
+                  <Text style={styles.sectionTitle}>1. Select Person Image</Text>
+                  <Text style={styles.sectionSubtitle}>Upload a clear photo of the missing person</Text>
+                </View>
+              </View>
               
-              {result.detection_summary && (
-                <View style={styles.summaryContainer}>
-                  <Text style={styles.summaryTitle}>Detection Summary:</Text>
-                  <Text style={styles.summaryText}>
-                    Total Frames: {result.detection_summary.total_frames}
-                  </Text>
-                  <Text style={styles.summaryText}>
-                    Detected Frames: {result.detection_summary.detected_frames}
-                  </Text>
-                  {result.detection_summary.detection_timestamps.length > 0 && (
-                    <Text style={styles.summaryText}>
-                      Detection Times: {result.detection_summary.detection_timestamps.map(t => `${t.toFixed(2)}s`).join(', ')}
-                    </Text>
-                  )}
-                </View>
-              )}
-
-              {downloading && (
-                <View style={styles.downloadingContainer}>
-                  <ActivityIndicator size="small" color="#FFA500" />
-                  <Text style={styles.downloadingText}>{downloadProgress}</Text>
-                </View>
-              )}
-
-              {downloadedFiles.length > 0 && (
-                <View style={styles.filesContainer}>
-                  <Text style={styles.filesTitle}>Downloaded Files:</Text>
-                  
-                  {downloadedFiles.map((file, index) => (
-                    <View key={index} style={styles.fileItem}>
-                      <Text style={styles.fileName}>{file.filename}</Text>
-                      
-                      {file.type === 'image' ? (
-                        <Image source={{ uri: file.uri }} style={styles.filePreview} />
-                      ) : (
-                        <Video
-                          source={{ uri: file.uri }}
-                          style={styles.videoPreview}
-                          useNativeControls
-                          shouldPlay={false}
-                        />
-                      )}
-                      
-                      <TouchableOpacity
-                        style={styles.viewButton}
-                        onPress={() => {
-                          // For videos, you might want to open in a video player
-                          // For images, they're already displayed
-                          if (file.type === 'video') {
-                            Alert.alert('Video File', `Video: ${file.filename}\n\nThis is the processed output video with face detection highlights.`);
-                          }
-                        }}
-                      >
-                        <Text style={styles.viewButtonText}>
-                          {file.type === 'video' ? 'View Video' : 'View Image'}
-                        </Text>
-                      </TouchableOpacity>
+              {personImage ? (
+                <View style={styles.imagePreviewContainer}>
+                  <View style={styles.imageWrapper}>
+                    <Image source={{ uri: personImage }} style={styles.previewImage} />
+                    <View style={styles.imageOverlay}>
+                      <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
                     </View>
-                  ))}
+                  </View>
+                  <TouchableOpacity onPress={pickPersonImage} style={styles.changeButton}>
+                    <Ionicons name="camera" size={16} color="#FF8C00" />
+                    <Text style={styles.changeButtonText}>Change Image</Text>
+                  </TouchableOpacity>
                 </View>
+              ) : (
+                <TouchableOpacity onPress={pickPersonImage} style={styles.selectButton}>
+                  <View style={styles.selectButtonIcon}>
+                    <Ionicons name="camera" size={32} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.selectButtonText}>Select Person Image</Text>
+                  <Text style={styles.selectButtonSubtext}>Tap to choose from gallery</Text>
+                </TouchableOpacity>
               )}
+            </View>
 
-              {result.output_video && (
-                <View style={styles.outputContainer}>
-                  <Text style={styles.outputTitle}>Output Files:</Text>
-                  <Text style={styles.outputText}>Video: {result.output_video}</Text>
-                  {result.detection_frame && (
-                    <Text style={styles.outputText}>Frame: {result.detection_frame}</Text>
-                  )}
-                  
-                  {downloadedFiles.length === 0 && !downloading && (
+            {/* Crowd Video Selection */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconContainer}>
+                  <Ionicons name="videocam" size={20} color="#FF8C00" />
+                </View>
+                <View style={styles.sectionTitleContainer}>
+                  <Text style={styles.sectionTitle}>2. Select Crowd Video</Text>
+                  <Text style={styles.sectionSubtitle}>Upload video footage to search in</Text>
+                </View>
+              </View>
+              
+              {crowdVideo ? (
+                <View style={styles.videoPreviewContainer}>
+                  <View style={styles.videoWrapper}>
+                    <Video
+                      source={{ uri: crowdVideo }}
+                      style={styles.videoPreview}
+                      useNativeControls
+                      resizeMode={ResizeMode.COVER}
+                      shouldPlay={false}
+                    />
+                    <View style={styles.videoOverlay}>
+                      <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={pickCrowdVideo} style={styles.changeButton}>
+                    <Ionicons name="videocam" size={16} color="#FF8C00" />
+                    <Text style={styles.changeButtonText}>Change Video</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity onPress={pickCrowdVideo} style={styles.selectButton}>
+                  <View style={styles.selectButtonIcon}>
+                    <Ionicons name="videocam" size={32} color="#FFFFFF" />
+                  </View>
+                  <Text style={styles.selectButtonText}>Select Crowd Video</Text>
+                  <Text style={styles.selectButtonSubtext}>Tap to choose from gallery</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Parameters */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionIconContainer}>
+                  <Ionicons name="settings" size={20} color="#FF8C00" />
+                </View>
+                <View style={styles.sectionTitleContainer}>
+                  <Text style={styles.sectionTitle}>3. Detection Parameters</Text>
+                  <Text style={styles.sectionSubtitle}>Fine-tune detection accuracy</Text>
+                </View>
+              </View>
+              
+              <View style={styles.parametersContainer}>
+                <View style={styles.parameterCard}>
+                  <View style={styles.parameterHeader}>
+                    <Ionicons name="search" size={18} color="#FF8C00" />
+                    <Text style={styles.parameterLabel}>Tolerance</Text>
+                  </View>
+                  <Text style={styles.parameterDescription}>Lower = more strict matching</Text>
+                  <TextInput
+                    style={styles.parameterInput}
+                    value={tolerance}
+                    onChangeText={setTolerance}
+                    keyboardType="numeric"
+                    placeholder="0.6"
+                  />
+                </View>
+                
+                <View style={styles.parameterCard}>
+                  <View style={styles.parameterHeader}>
+                    <Ionicons name="speedometer" size={18} color="#FF8C00" />
+                    <Text style={styles.parameterLabel}>Frame Skip</Text>
+                  </View>
+                  <Text style={styles.parameterDescription}>Higher = faster processing</Text>
+                  <TextInput
+                    style={styles.parameterInput}
+                    value={frameSkip}
+                    onChangeText={setFrameSkip}
+                    keyboardType="numeric"
+                    placeholder="5"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Analyze Button */}
+            <TouchableOpacity
+              onPress={analyzeFaceDetection}
+              style={[styles.analyzeButton, loading && styles.analyzeButtonDisabled]}
+              disabled={loading || !personImage || !crowdVideo}
+            >
+              <View style={styles.analyzeButtonContent}>
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Ionicons name="search" size={20} color="#FFFFFF" />
+                )}
+                <Text style={styles.analyzeButtonText}>
+                  {loading ? 'Analyzing...' : 'Start Face Detection'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.resultContainer}>
+            {/* Results Header */}
+            <View style={styles.resultHeader}>
+              <View style={styles.resultIconContainer}>
+                <Ionicons 
+                  name={result.success ? "checkmark-circle" : "close-circle"} 
+                  size={32} 
+                  color={result.success ? "#4CAF50" : "#F44336"} 
+                />
+              </View>
+              <View style={styles.resultTitleContainer}>
+                <Text style={styles.resultTitle}>
+                  {result.success ? "Detection Complete" : "Detection Failed"}
+                </Text>
+                <Text style={styles.resultSubtitle}>
+                  {result.success ? "Face detection analysis finished successfully" : "Analysis could not be completed"}
+                </Text>
+              </View>
+            </View>
+            
+            {result.success ? (
+              <View style={styles.successContent}>
+                {/* Success Message */}
+                <View style={styles.successMessageCard}>
+                  <View style={styles.successIconContainer}>
+                    <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                  </View>
+                  <Text style={styles.successMessage}>{result.message}</Text>
+                </View>
+                
+                {/* Detection Summary */}
+                {result.detection_summary && (
+                  <View style={styles.summaryCard}>
+                    <View style={styles.summaryHeader}>
+                      <Ionicons name="analytics" size={20} color="#FF8C00" />
+                      <Text style={styles.summaryTitle}>Detection Summary</Text>
+                    </View>
+                    
+                    <View style={styles.summaryGrid}>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryValue}>{result.detection_summary.total_frames}</Text>
+                        <Text style={styles.summaryLabel}>Total Frames</Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryValue}>{result.detection_summary.detected_frames}</Text>
+                        <Text style={styles.summaryLabel}>Detected Frames</Text>
+                      </View>
+                      <View style={styles.summaryItem}>
+                        <Text style={styles.summaryValue}>
+                          {((result.detection_summary.detected_frames / result.detection_summary.total_frames) * 100).toFixed(1)}%
+                        </Text>
+                        <Text style={styles.summaryLabel}>Match Rate</Text>
+                      </View>
+                    </View>
+                    
+                    {result.detection_summary.detection_timestamps.length > 0 && (
+                      <View style={styles.timestampsContainer}>
+                        <Text style={styles.timestampsTitle}>Detection Timestamps:</Text>
+                        <View style={styles.timestampsList}>
+                          {result.detection_summary.detection_timestamps.slice(0, 10).map((timestamp, index) => (
+                            <View key={index} style={styles.timestampTag}>
+                              <Text style={styles.timestampText}>{timestamp.toFixed(1)}s</Text>
+                            </View>
+                          ))}
+                          {result.detection_summary.detection_timestamps.length > 10 && (
+                            <View style={styles.timestampTag}>
+                              <Text style={styles.timestampText}>+{result.detection_summary.detection_timestamps.length - 10} more</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                {/* Download Progress */}
+                {downloading && (
+                  <View style={styles.downloadingCard}>
+                    <View style={styles.downloadingHeader}>
+                      <ActivityIndicator size="small" color="#FF8C00" />
+                      <Text style={styles.downloadingTitle}>Downloading Results</Text>
+                    </View>
+                    <Text style={styles.downloadingText}>{downloadProgress}</Text>
+                  </View>
+                )}
+
+                {/* Downloaded Files */}
+                {downloadedFiles.length > 0 && (
+                  <View style={styles.filesCard}>
+                    <View style={styles.filesHeader}>
+                      <Ionicons name="download" size={20} color="#FF8C00" />
+                      <Text style={styles.filesTitle}>Analysis Results</Text>
+                    </View>
+                    
+                    {downloadedFiles.map((file, index) => (
+                      <View key={index} style={styles.fileCard}>
+                        <View style={styles.fileHeader}>
+                          <View style={styles.fileIconContainer}>
+                            <Ionicons 
+                              name={file.type === 'video' ? 'videocam' : 'image'} 
+                              size={20} 
+                              color="#FF8C00" 
+                            />
+                          </View>
+                          <View style={styles.fileInfo}>
+                            <Text style={styles.fileName}>{file.filename}</Text>
+                            <Text style={styles.fileType}>
+                              {file.type === 'video' ? 'Processed Video' : 'Detection Frame'}
+                            </Text>
+                          </View>
+                        </View>
+                        
+                        <View style={styles.filePreviewContainer}>
+                          {file.type === 'image' ? (
+                            <Image source={{ uri: file.uri }} style={styles.filePreview} />
+                          ) : (
+                            <Video
+                              source={{ uri: file.uri }}
+                              style={styles.filePreview}
+                              useNativeControls
+                              resizeMode={ResizeMode.COVER}
+                              shouldPlay={false}
+                            />
+                          )}
+                        </View>
+                        
+                        <TouchableOpacity
+                          style={styles.viewButton}
+                          onPress={() => {
+                            if (file.type === 'video') {
+                              Alert.alert(
+                                'Processed Video', 
+                                `This video shows the original footage with face detection highlights.\n\nFilename: ${file.filename}`
+                              );
+                            } else {
+                              Alert.alert(
+                                'Detection Frame', 
+                                `This image shows a frame where the missing person was detected.\n\nFilename: ${file.filename}`
+                              );
+                            }
+                          }}
+                        >
+                          <Ionicons 
+                            name={file.type === 'video' ? 'play-circle' : 'eye'} 
+                            size={16} 
+                            color="#FFFFFF" 
+                          />
+                          <Text style={styles.viewButtonText}>
+                            {file.type === 'video' ? 'Play Video' : 'View Image'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {/* Manual Download */}
+                {result.output_video && downloadedFiles.length === 0 && !downloading && (
+                  <View style={styles.manualDownloadCard}>
+                    <View style={styles.manualDownloadHeader}>
+                      <Ionicons name="cloud-download" size={20} color="#FF8C00" />
+                      <Text style={styles.manualDownloadTitle}>Download Results</Text>
+                    </View>
+                    <Text style={styles.manualDownloadText}>
+                      Click below to download the analysis results
+                    </Text>
                     <TouchableOpacity
                       style={styles.manualDownloadButton}
                       onPress={() => downloadOutputFiles(result)}
                     >
-                      <Text style={styles.manualDownloadButtonText}>Download Files Manually</Text>
+                      <Ionicons name="download" size={16} color="#FFFFFF" />
+                      <Text style={styles.manualDownloadButtonText}>Download Files</Text>
                     </TouchableOpacity>
-                  )}
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.errorCard}>
+                <View style={styles.errorHeader}>
+                  <Ionicons name="alert-circle" size={24} color="#F44336" />
+                  <Text style={styles.errorTitle}>Analysis Failed</Text>
                 </View>
+                <Text style={styles.errorMessage}>{result.message}</Text>
+              </View>
+            )}
+
+            {/* Action Buttons */}
+            <View style={styles.actionButtonsContainer}>
+              <TouchableOpacity onPress={resetAnalysis} style={styles.resetButton}>
+                <Ionicons name="refresh" size={16} color="#666666" />
+                <Text style={styles.resetButtonText}>New Analysis</Text>
+              </TouchableOpacity>
+              
+              {result.success && (
+                <TouchableOpacity 
+                  onPress={() => router.back()} 
+                  style={styles.backToHomeButton}
+                >
+                  <Ionicons name="home" size={16} color="#FFFFFF" />
+                  <Text style={styles.backToHomeButtonText}>Back to Dashboard</Text>
+                </TouchableOpacity>
               )}
             </View>
-          ) : (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>✗ {result.message}</Text>
-            </View>
-          )}
-
-          <TouchableOpacity onPress={resetAnalysis} style={styles.resetButton}>
-            <Text style={styles.resetButtonText}>New Analysis</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </ScrollView>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
+  },
+  scrollView: {
+    flex: 1,
   },
   header: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 12,
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    justifyContent: 'space-between',
   },
   backButton: {
-    marginRight: 16,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#FFA500',
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  content: {
-    padding: 16,
-  },
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8F9FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  imageContainer: {
-    alignItems: 'center',
-  },
-  previewImage: {
-    width: 300,
-    height: 300,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  videoContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  videoText: {
-    fontSize: 16,
-    color: '#4CAF50',
-    marginBottom: 12,
-  },
-  selectButton: {
-    backgroundColor: '#FFA500',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  selectButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  changeButton: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  changeButtonText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  parameterRow: {
+  titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+    marginLeft: 16,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FF8C00',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#FF8C00',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  titleTextContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 18,
+    shadowColor: '#4CAF50',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FFFFFF',
+    marginRight: 4,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  content: {
+    paddingHorizontal: 20,
+  },
+  section: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sectionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  sectionTitleContainer: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    alignItems: 'center',
+  },
+  imageWrapper: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  previewImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 16,
+    borderWidth: 3,
+    borderColor: '#4CAF50',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  videoPreviewContainer: {
+    alignItems: 'center',
+  },
+  videoWrapper: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  videoPreview: {
+    width: 200,
+    height: 150,
+    borderRadius: 16,
+    borderWidth: 3,
+    borderColor: '#4CAF50',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  selectButton: {
+    backgroundColor: '#FF8C00',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  selectButtonIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
+  },
+  selectButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  selectButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  changeButton: {
+    backgroundColor: '#F8F9FA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 8,
+  },
+  changeButtonText: {
+    color: '#FF8C00',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  parametersContainer: {
+    gap: 16,
+  },
+  parameterCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  parameterHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
   },
   parameterLabel: {
-    flex: 1,
     fontSize: 16,
-    color: '#333',
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  parameterDescription: {
+    fontSize: 12,
+    color: '#666666',
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   parameterInput: {
-    flex: 1,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 10,
     fontSize: 16,
+    color: '#333333',
   },
   analyzeButton: {
-    backgroundColor: '#FFA500',
+    backgroundColor: '#FF8C00',
+    borderRadius: 16,
     paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
     marginTop: 8,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   analyzeButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#CCCCCC',
+    shadowOpacity: 0.1,
   },
-  analyzeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  resultContainer: {
-    padding: 16,
-  },
-  resultTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  successContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  successText: {
-    fontSize: 16,
-    color: '#4CAF50',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  summaryContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  summaryText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  outputContainer: {
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-    padding: 12,
-  },
-  outputTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1976d2',
-    marginBottom: 8,
-  },
-  outputText: {
-    fontSize: 14,
-    color: '#1976d2',
-    marginBottom: 4,
-  },
-  errorContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#f44336',
-    textAlign: 'center',
-  },
-  resetButton: {
-    backgroundColor: '#666',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  downloadingContainer: {
+  analyzeButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff3cd',
-    padding: 12,
-    borderRadius: 8,
+    gap: 8,
+  },
+  analyzeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  resultContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 100,
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  resultIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F8F9FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  resultTitleContainer: {
+    flex: 1,
+  },
+  resultTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 4,
+  },
+  resultSubtitle: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  successContent: {
+    gap: 20,
+  },
+  successMessageCard: {
+    backgroundColor: '#E8F5E8',
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  successIconContainer: {
+    marginRight: 16,
+  },
+  successMessage: {
+    flex: 1,
+    fontSize: 16,
+    color: '#2E7D32',
+    fontWeight: '600',
+  },
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     marginBottom: 16,
   },
-  downloadingText: {
-    marginLeft: 8,
-    color: '#856404',
-    fontSize: 14,
+  summaryItem: {
+    alignItems: 'center',
+    flex: 1,
   },
-  filesContainer: {
-    backgroundColor: '#fff',
+  summaryValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FF8C00',
+    marginBottom: 4,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  timestampsContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    paddingTop: 16,
+  },
+  timestampsTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 12,
+  },
+  timestampsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timestampTag: {
+    backgroundColor: '#FF8C00',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  timestampText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  downloadingCard: {
+    backgroundColor: '#FFF3E0',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#FF8C00',
+  },
+  downloadingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  downloadingTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FF8C00',
+  },
+  downloadingText: {
+    fontSize: 14,
+    color: '#E65100',
+    fontWeight: '500',
+  },
+  filesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
+  filesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  filesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  fileCard: {
+    backgroundColor: '#F8F9FA',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
-  filesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  fileItem: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
+  fileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  fileIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFF3E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  fileInfo: {
+    flex: 1,
   },
   fileName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 2,
+  },
+  fileType: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  filePreviewContainer: {
+    marginBottom: 12,
   },
   filePreview: {
     width: '100%',
-    height: 300,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  videoPreview: {
-    width: '100%',
-    height: 300,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  videoPreviewContainer: {
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  videoPreviewText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1976d2',
-    marginBottom: 4,
-  },
-  videoPreviewSubtext: {
-    fontSize: 14,
-    color: '#1976d2',
+    height: 200,
+    borderRadius: 12,
   },
   viewButton: {
-    backgroundColor: '#FFA500',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
+    backgroundColor: '#FF8C00',
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  viewButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  manualDownloadButton: {
-    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 6,
+    borderRadius: 8,
+    gap: 6,
+  },
+  viewButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  manualDownloadCard: {
+    backgroundColor: '#E3F2FD',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+  },
+  manualDownloadHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  manualDownloadTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1976D2',
+  },
+  manualDownloadText: {
+    fontSize: 14,
+    color: '#1976D2',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  manualDownloadButton: {
+    backgroundColor: '#2196F3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
   },
   manualDownloadButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  errorCard: {
+    backgroundColor: '#FFEBEE',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#F44336',
+  },
+  errorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#C62828',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#C62828',
+    fontWeight: '500',
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 6,
+  },
+  resetButtonText: {
+    color: '#666666',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  backToHomeButton: {
+    flex: 1,
+    backgroundColor: '#FF8C00',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    gap: 6,
+  },
+  backToHomeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

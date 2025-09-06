@@ -2,13 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import FirebaseService, { AmbulanceRequest } from '../../lib/firebaseService';
 import NotificationService from '../../lib/notificationService';
@@ -193,11 +193,16 @@ export default function MyRequestsScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Ambulance Requests</Text>
-          <Text style={styles.headerSubtitle}>Track your emergency requests</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>My Requests</Text>
+            <Text style={styles.headerSubtitle}>Track your emergency requests</Text>
+          </View>
+          <View style={styles.headerIcon}>
+            <Ionicons name="medical" size={18} color="#FFFFFF" />
+          </View>
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B6B" />
+          <ActivityIndicator size="large" color="#FF8C00" />
           <Text style={styles.loadingText}>Loading your requests...</Text>
         </View>
       </View>
@@ -208,8 +213,13 @@ export default function MyRequestsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Ambulance Requests</Text>
-        <Text style={styles.headerSubtitle}>Track your emergency requests</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>My Requests</Text>
+          <Text style={styles.headerSubtitle}>Track your emergency requests</Text>
+        </View>
+        <View style={styles.headerIcon}>
+          <Ionicons name="medical" size={18} color="#FFFFFF" />
+        </View>
       </View>
 
       {/* Request New Ambulance Button */}
@@ -218,7 +228,7 @@ export default function MyRequestsScreen() {
           style={styles.newRequestButton}
           onPress={() => router.push('/user-ambulance-request')}
         >
-          <Ionicons name="add" size={20} color="white" />
+          <Ionicons name="add" size={18} color="white" />
           <Text style={styles.newRequestButtonText}>Request New Ambulance</Text>
         </TouchableOpacity>
       </View>
@@ -234,13 +244,13 @@ export default function MyRequestsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#FF6B6B']}
-            tintColor="#FF6B6B"
+            colors={['#FF8C00']}
+            tintColor="#FF8C00"
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="medical-outline" size={64} color="#ccc" />
+            <Ionicons name="medical-outline" size={64} color="#FF8C00" />
             <Text style={styles.emptyText}>No ambulance requests found</Text>
             <Text style={styles.emptySubtext}>
               Tap the button above to request an ambulance
@@ -255,42 +265,77 @@ export default function MyRequestsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
   },
   header: {
-    backgroundColor: '#FF6B6B',
-    padding: 20,
+    backgroundColor: '#FF8C00',
     paddingTop: 60,
-    paddingBottom: 20,
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 12,
+    position: 'relative',
+    zIndex: 1,
+  },
+  headerContent: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
+    color: '#FFFFFF',
+    marginBottom: 1,
+    letterSpacing: 0.5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontWeight: '500',
+  },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   newRequestContainer: {
-    padding: 20,
-    backgroundColor: 'white',
+    padding: 16,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   newRequestButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 15,
+    backgroundColor: '#FF8C00',
+    paddingVertical: 12,
     borderRadius: 12,
     gap: 8,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   newRequestButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '600',
   },
   listContainer: {
@@ -305,7 +350,8 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#666666',
+    fontWeight: '500',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -314,25 +360,28 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#666',
+    color: '#000000',
     marginTop: 16,
+    fontWeight: '600',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#666666',
     marginTop: 8,
     textAlign: 'center',
   },
   requestItem: {
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 6,
   },
   requestHeader: {
     flexDirection: 'row',
@@ -347,12 +396,12 @@ const styles = StyleSheet.create({
   patientName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#000000',
     marginBottom: 4,
   },
   patientPhone: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -370,17 +419,20 @@ const styles = StyleSheet.create({
   statusMessage: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8F9FA',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
     gap: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   statusMessageText: {
     flex: 1,
     fontSize: 14,
-    color: '#333',
+    color: '#000000',
     lineHeight: 20,
+    fontWeight: '500',
   },
   emergencyInfo: {
     marginBottom: 12,
@@ -394,11 +446,11 @@ const styles = StyleSheet.create({
   emergencyTypeText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#dc3545',
+    color: '#EF4444',
   },
   description: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
     fontStyle: 'italic',
   },
   locationInfo: {
@@ -409,29 +461,31 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
   },
   hospitalInfo: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8F9FA',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   hospitalText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#28a745',
+    color: '#22C55E',
     marginLeft: 8,
   },
   timeText: {
     fontSize: 12,
-    color: '#666',
+    color: '#666666',
     marginLeft: 24,
     marginTop: 4,
   },
   distanceText: {
     fontSize: 12,
-    color: '#666',
+    color: '#666666',
     marginLeft: 24,
     marginTop: 2,
   },
@@ -450,7 +504,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   routeButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   actionButtonText: {
     color: 'white',

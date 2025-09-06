@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     backgroundColor: '#FF8C00',
-    paddingTop: 30,
+    paddingTop: 60,
     paddingBottom: 12,
     paddingHorizontal: 20,
     flexDirection: 'row',
@@ -348,6 +348,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
+    position: 'relative',
+    zIndex: 1,
   },
   headerContent: {
     flex: 1,
@@ -645,3 +647,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+

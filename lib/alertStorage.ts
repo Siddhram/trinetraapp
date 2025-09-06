@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { arrayUnion, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 import NotificationService, { CrowdAlertNotificationData } from './notificationService';
 
 export interface AlertData {
@@ -25,11 +27,25 @@ const ALERTS_STORAGE_KEY = 'trinetra_alerts';
 export class AlertStorage {
   static async getAllAlerts(): Promise<AlertData[]> {
     try {
+      // First try to get from Firebase
+      const firebaseAlerts = await this.getAlertsFromFirebase();
+      if (firebaseAlerts.length > 0) {
+        return firebaseAlerts;
+      }
+      
+      // Fallback to local storage
       const alertsJson = await AsyncStorage.getItem(ALERTS_STORAGE_KEY);
       return alertsJson ? JSON.parse(alertsJson) : [];
     } catch (error) {
       console.error('Failed to get alerts:', error);
-      return [];
+      // Fallback to local storage on error
+      try {
+        const alertsJson = await AsyncStorage.getItem(ALERTS_STORAGE_KEY);
+        return alertsJson ? JSON.parse(alertsJson) : [];
+      } catch (localError) {
+        console.error('Failed to get alerts from local storage:', localError);
+        return [];
+      }
     }
   }
 
@@ -53,6 +69,9 @@ export class AlertStorage {
       }
       
       await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(alerts));
+      
+      // Save to Firebase under user's document
+      await this.saveToFirebase(enhancedAlert);
       
       // Backup to secondary storage for government compliance
       await this.backupAlert(enhancedAlert);
@@ -132,6 +151,9 @@ export class AlertStorage {
         alert.id === alertId ? { ...alert, ...updates } : alert
       );
       await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updatedAlerts));
+      
+      // Also update in Firebase
+      await this.updateAlertsInFirebase(updatedAlerts);
     } catch (error) {
       console.error('Failed to update alert:', error);
     }
@@ -142,6 +164,9 @@ export class AlertStorage {
       const alerts = await this.getAllAlerts();
       const filteredAlerts = alerts.filter(alert => alert.id !== alertId);
       await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(filteredAlerts));
+      
+      // Also update in Firebase
+      await this.updateAlertsInFirebase(filteredAlerts);
     } catch (error) {
       console.error('Failed to delete alert:', error);
     }
@@ -150,6 +175,9 @@ export class AlertStorage {
   static async clearAllAlerts(): Promise<void> {
     try {
       await AsyncStorage.removeItem(ALERTS_STORAGE_KEY);
+      
+      // Also clear in Firebase
+      await this.updateAlertsInFirebase([]);
     } catch (error) {
       console.error('Failed to clear alerts:', error);
     }
@@ -164,8 +192,78 @@ export class AlertStorage {
       const alerts = await this.getAllAlerts();
       const updatedAlerts = alerts.map(alert => ({ ...alert, isRead: true }));
       await AsyncStorage.setItem(ALERTS_STORAGE_KEY, JSON.stringify(updatedAlerts));
+      
+      // Also update in Firebase
+      await this.updateAlertsInFirebase(updatedAlerts);
     } catch (error) {
       console.error('Failed to mark all alerts as read:', error);
+    }
+  }
+
+  // Firebase methods
+  private static async saveToFirebase(alert: AlertData): Promise<void> {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.warn('No authenticated user, skipping Firebase save');
+        return;
+      }
+
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        futureCrowdDetectionAlerts: arrayUnion(alert)
+      });
+      
+      console.log('Alert saved to Firebase for user:', currentUser.uid);
+    } catch (error) {
+      console.error('Failed to save alert to Firebase:', error);
+    }
+  }
+
+  private static async getAlertsFromFirebase(): Promise<AlertData[]> {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.warn('No authenticated user, returning empty alerts');
+        return [];
+      }
+
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userSnap = await getDoc(userRef);
+      
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        const alerts = userData.futureCrowdDetectionAlerts || [];
+        
+        // Sort by timestamp (newest first)
+        return alerts.sort((a: AlertData, b: AlertData) => 
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Failed to get alerts from Firebase:', error);
+      return [];
+    }
+  }
+
+  private static async updateAlertsInFirebase(alerts: AlertData[]): Promise<void> {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.warn('No authenticated user, skipping Firebase update');
+        return;
+      }
+
+      const userRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userRef, {
+        futureCrowdDetectionAlerts: alerts
+      });
+      
+      console.log('Alerts updated in Firebase for user:', currentUser.uid);
+    } catch (error) {
+      console.error('Failed to update alerts in Firebase:', error);
     }
   }
 }
