@@ -9,14 +9,16 @@ import {
   FlatList,
   Image,
   Modal,
+  SafeAreaView,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import { ThemedText } from '../../components/ThemedText';
+import { ThemedView } from '../../components/ThemedView';
 import { auth } from '../../lib/firebase';
 import FirebaseService, { MissingPersonReport } from '../../lib/firebaseService';
 
@@ -327,27 +329,32 @@ export default function MissingPersonScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FF8C00" />
-        <Text style={styles.loadingText}>Loading your reports...</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <ThemedView style={styles.loadingContainer}>
+          <View style={styles.loadingContent}>
+            <ActivityIndicator size="large" color="#FF8C00" />
+            <ThemedText style={styles.loadingText}>Loading your reports...</ThemedText>
+          </View>
+        </ThemedView>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      
-      {/* Header */}
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safeArea}>
+      <ThemedView style={styles.container}>
+        {/* <StatusBar barStyle="light-content" /> */}
+        
+        {/* Header */}
+        <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.titleContainer}>
             <View style={styles.iconContainer}>
               <Ionicons name="search" size={20} color="#FFFFFF" />
             </View>
             <View style={styles.titleTextContainer}>
-              <Text style={styles.title}>Missing Family Member</Text>
-              <Text style={styles.subtitle}>Report and track missing persons</Text>
+              <ThemedText style={styles.title}>Missing Family Member</ThemedText>
+              <ThemedText style={styles.subtitle}>Report and track missing persons</ThemedText>
             </View>
           </View>
           <TouchableOpacity 
@@ -371,17 +378,18 @@ export default function MissingPersonScreen() {
       ) : (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconContainer}>
-            <Ionicons name="search" size={48} color="#CCCCCC" />
+            <Ionicons name="search" size={64} color="#FF8C00" />
           </View>
-          <Text style={styles.emptyTitle}>No Missing Person Reports</Text>
-          <Text style={styles.emptyText}>
+          <ThemedText style={styles.emptyTitle}>No Missing Person Reports</ThemedText>
+          <ThemedText style={styles.emptyText}>
             You haven't submitted any missing person reports yet. Tap the + button to create your first report.
-          </Text>
+          </ThemedText>
           <TouchableOpacity 
             style={styles.createFirstButton}
             onPress={() => setShowForm(true)}
           >
-            <Text style={styles.createFirstButtonText}>Create First Report</Text>
+            <Ionicons name="add" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <ThemedText style={styles.createFirstButtonText}>Create First Report</ThemedText>
           </TouchableOpacity>
         </View>
       )}
@@ -391,7 +399,12 @@ export default function MissingPersonScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Report Missing Person</Text>
+              <View style={styles.modalTitleContainer}>
+                <View style={styles.modalIconContainer}>
+                  <Ionicons name="person-add" size={20} color="#FF8C00" />
+                </View>
+                <ThemedText style={styles.modalTitle}>Report Missing Person</ThemedText>
+              </View>
               <TouchableOpacity 
                 style={styles.closeButton}
                 onPress={() => {
@@ -406,7 +419,7 @@ export default function MissingPersonScreen() {
             <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
               {/* Image Upload */}
               <View style={styles.imageUploadContainer}>
-                <Text style={styles.sectionTitle}>Photo (Optional)</Text>
+                <ThemedText style={styles.sectionTitle}>Photo (Optional)</ThemedText>
                 <TouchableOpacity 
                   style={styles.imageUploadButton}
                   onPress={pickImage}
@@ -421,9 +434,9 @@ export default function MissingPersonScreen() {
                       ) : (
                         <Ionicons name="camera" size={32} color="#CCCCCC" />
                       )}
-                      <Text style={styles.imageUploadText}>
+                      <ThemedText style={styles.imageUploadText}>
                         {imageUploading ? 'Uploading...' : 'Tap to add photo'}
-                      </Text>
+                      </ThemedText>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -431,43 +444,47 @@ export default function MissingPersonScreen() {
 
               {/* Form Fields */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Missing Person's Name *</Text>
+                <ThemedText style={styles.label}>Missing Person's Name *</ThemedText>
                 <TextInput
                   style={styles.input}
                   value={formData.missingPersonName}
                   onChangeText={(text) => setFormData({...formData, missingPersonName: text})}
                   placeholder="Enter full name"
+                  placeholderTextColor="#999999"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Age *</Text>
+                <ThemedText style={styles.label}>Age *</ThemedText>
                 <TextInput
                   style={styles.input}
                   value={formData.missingPersonAge}
                   onChangeText={(text) => setFormData({...formData, missingPersonAge: text})}
                   placeholder="Enter age"
+                  placeholderTextColor="#999999"
                   keyboardType="numeric"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Your Relationship *</Text>
+                <ThemedText style={styles.label}>Your Relationship *</ThemedText>
                 <TextInput
                   style={styles.input}
                   value={formData.relationship}
                   onChangeText={(text) => setFormData({...formData, relationship: text})}
                   placeholder="e.g., Father, Mother, Brother, Sister, etc."
+                  placeholderTextColor="#999999"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Description *</Text>
+                <ThemedText style={styles.label}>Description *</ThemedText>
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={formData.missingPersonDescription}
                   onChangeText={(text) => setFormData({...formData, missingPersonDescription: text})}
                   placeholder="Describe the missing person (clothing, physical features, etc.)"
+                  placeholderTextColor="#999999"
                   multiline
                   numberOfLines={4}
                   textAlignVertical="top"
@@ -475,22 +492,24 @@ export default function MissingPersonScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Last Seen Location</Text>
+                <ThemedText style={styles.label}>Last Seen Location</ThemedText>
                 <TextInput
                   style={styles.input}
                   value={formData.lastSeenLocation}
                   onChangeText={(text) => setFormData({...formData, lastSeenLocation: text})}
                   placeholder="Where was the person last seen?"
+                  placeholderTextColor="#999999"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Last Seen Date</Text>
+                <ThemedText style={styles.label}>Last Seen Date</ThemedText>
                 <TextInput
                   style={styles.input}
                   value={formData.lastSeenDate}
                   onChangeText={(text) => setFormData({...formData, lastSeenDate: text})}
                   placeholder="When was the person last seen? (e.g., 2024-01-15)"
+                  placeholderTextColor="#999999"
                 />
               </View>
             </ScrollView>
@@ -503,7 +522,7 @@ export default function MissingPersonScreen() {
                   resetForm();
                 }}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <ThemedText style={styles.cancelBtnText}>Cancel</ThemedText>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
@@ -513,18 +532,25 @@ export default function MissingPersonScreen() {
                 {submitting ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.submitBtnText}>Submit Report</Text>
+                  <View style={styles.submitButtonContent}>
+                    <Ionicons name="checkmark" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <ThemedText style={styles.submitBtnText}>Submit Report</ThemedText>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-    </View>
+      </ThemedView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8F9FA',
@@ -535,21 +561,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#F8F9FA',
   },
+  loadingContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
     color: '#666666',
+    fontWeight: '500',
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FF8C00',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 12,
     marginBottom: 20,
@@ -565,45 +596,39 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FF8C00',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
-    shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   titleTextContainer: {
     flex: 1,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#FFFFFF',
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666666',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
   },
   addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FF8C00',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   listContainer: {
     paddingHorizontal: 20,
@@ -611,40 +636,55 @@ const styles = StyleSheet.create({
   },
   reportCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: '#FFE4B5',
+    position: 'relative',
   },
   cardHeader: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FFF8F0',
+    position: 'relative',
   },
   imageContainer: {
     marginRight: 16,
   },
   personImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   noImagePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F8F9FA',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFF8F0',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderWidth: 3,
+    borderColor: '#FF8C00',
+    shadowColor: '#FF8C00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   headerInfo: {
     flex: 1,
@@ -654,14 +694,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   personName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#2C3E50',
     marginBottom: 4,
   },
   personAge: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 12,
+    color: '#7F8C8D',
     fontWeight: '500',
     marginBottom: 2,
   },
@@ -669,80 +709,101 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#FF8C00',
     fontWeight: '600',
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     alignSelf: 'flex-start',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   statusText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginLeft: 4,
+    marginLeft: 6,
   },
   descriptionContainer: {
-    padding: 16,
-    paddingTop: 8,
+    padding: 20,
+    paddingTop: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F3F4F6',
+    backgroundColor: '#FAFAFA',
   },
   personDescription: {
     fontSize: 14,
-    color: '#333333',
-    lineHeight: 20,
+    color: '#374151',
+    lineHeight: 22,
+    fontWeight: '500',
   },
   lastSeenContainer: {
-    padding: 16,
-    backgroundColor: '#F8F9FA',
+    padding: 20,
+    backgroundColor: '#FFF8F0',
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F3F4F6',
   },
   lastSeenHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   lastSeenTitle: {
     fontSize: 12,
     color: '#FF8C00',
     fontWeight: '600',
     marginLeft: 6,
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   lastSeenLocation: {
     fontSize: 14,
-    color: '#333333',
-    fontWeight: '500',
+    color: '#374151',
+    fontWeight: '600',
     marginBottom: 4,
   },
   lastSeenDate: {
     fontSize: 12,
-    color: '#666666',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   adminInfo: {
-    padding: 16,
-    backgroundColor: '#F8F9FA',
+    padding: 20,
+    backgroundColor: '#F0F9FF',
   },
   foundInfo: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   foundHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   foundTitle: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: '#059669',
     fontWeight: '600',
     marginLeft: 6,
+    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   foundAddress: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#059669',
     fontWeight: '600',
   },
   notesInfo: {
@@ -751,32 +812,40 @@ const styles = StyleSheet.create({
   notesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   notesTitle: {
     fontSize: 12,
     color: '#FF8C00',
     fontWeight: '600',
     marginLeft: 6,
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   adminNotes: {
     fontSize: 14,
-    color: '#333333',
+    color: '#374151',
     fontStyle: 'italic',
+    fontWeight: '500',
   },
   reportFooter: {
-    padding: 16,
+    padding: 20,
     backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
   },
   reportDate: {
     fontSize: 12,
-    color: '#666666',
+    color: '#6B7280',
     marginBottom: 4,
+    fontWeight: '500',
   },
   updateDate: {
     fontSize: 12,
     color: '#FF8C00',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
@@ -785,19 +854,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F8F9FA',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 140, 0, 0.2)',
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 8,
+    color: '#000000',
+    marginBottom: 12,
     textAlign: 'center',
   },
   emptyText: {
@@ -805,18 +876,21 @@ const styles = StyleSheet.create({
     color: '#666666',
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: 24,
+    marginBottom: 32,
   },
   createFirstButton: {
     backgroundColor: '#FF8C00',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 16,
     shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   createFirstButtonText: {
     color: '#FFFFFF',
@@ -825,45 +899,59 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 24,
     width: '95%',
     maxHeight: '90%',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  modalIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#FF8C00',
+    color: '#000000',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F8F9FA',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   formContainer: {
     maxHeight: '70%',
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   imageUploadContainer: {
     marginBottom: 20,
@@ -871,7 +959,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#000000',
     marginBottom: 12,
   },
   imageUploadButton: {
@@ -879,24 +967,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   uploadedImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   imageUploadPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: '#F8F9FA',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#E0E0E0',
+    borderColor: '#E5E7EB',
     borderStyle: 'dashed',
   },
   imageUploadText: {
-    fontSize: 12,
-    color: '#CCCCCC',
+    fontSize: 14,
+    color: '#9CA3AF',
     marginTop: 8,
     textAlign: 'center',
   },
@@ -906,35 +994,40 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333333',
+    color: '#000000',
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#D1D5DB',
     borderRadius: 12,
     padding: 16,
     fontSize: 14,
-    color: '#333333',
+    color: '#000000',
     backgroundColor: '#FFFFFF',
   },
   textArea: {
-    height: 80,
+    height: 100,
     textAlignVertical: 'top',
   },
   modalButtons: {
     flexDirection: 'row',
-    padding: 20,
-    gap: 12,
+    padding: 24,
+    gap: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#F3F4F6',
   },
   cancelBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#6C757D',
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: '#6B7280',
     alignItems: 'center',
+    shadowColor: '#6B7280',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cancelBtnText: {
     color: '#FFFFFF',
@@ -943,20 +1036,25 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
     backgroundColor: '#FF8C00',
     alignItems: 'center',
     shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   submitBtnDisabled: {
-    backgroundColor: '#CCCCCC',
+    backgroundColor: '#D1D5DB',
     shadowOpacity: 0,
     elevation: 0,
+  },
+  submitButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   submitBtnText: {
     color: '#FFFFFF',
