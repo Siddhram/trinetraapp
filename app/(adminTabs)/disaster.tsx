@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { BackHandler, StyleSheet, View } from 'react-native';
+import { BackHandler, SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 
 export default function DisasterScreen() {
@@ -23,9 +23,11 @@ export default function DisasterScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      {/* Top orange color padding area */}
-      <View style={styles.topPadding} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      
+      {/* Orange header area */}
+      <View style={styles.headerArea} />
       
       <View style={styles.webViewContainer}>
         <WebView
@@ -48,18 +50,18 @@ export default function DisasterScreen() {
           }}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fff', // White background for SafeAreaView
   },
-  topPadding: {
-    height: 30, // Top padding height
-    backgroundColor: '#F28500', // Orange color from your image
+  headerArea: {
+    height: 30, // Additional header height
+    backgroundColor: '#FF7518', // Orange color
   },
   webViewContainer: {
     flex: 1,

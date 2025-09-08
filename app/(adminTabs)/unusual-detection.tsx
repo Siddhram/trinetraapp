@@ -29,13 +29,20 @@ interface AnalysisResult {
     status: 'normal' | 'anomaly' | 'critical' | 'error' | 'safe' | 'danger';
     summary?: string;
     weapons: string[];
+    fighting_detected?: boolean;
+    fire_detected?: boolean;
+    suspicious_activity?: boolean;
   };
   frame_screenshot?: string;
   person_images?: PersonImage[];
 }
 
 interface ApiResponse {
+  success?: boolean;
   results: AnalysisResult[];
+  total_frames?: number;
+  threats_detected?: number;
+  error?: string;
 }
 
 export default function UnusualDetectionScreen() {
@@ -45,11 +52,15 @@ export default function UnusualDetectionScreen() {
   const [selectedFileUri, setSelectedFileUri] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [analysisStats, setAnalysisStats] = useState<{
+    totalFrames: number;
+    threatsDetected: number;
+  } | null>(null);
 
   // Backend API URL - Update this to match your server
   // For local development: 'http://localhost:5002'
   // For production: 'https://your-domain.com'
-  const API_BASE_URL = 'http://172.20.10.4:5002';
+  const API_BASE_URL = 'http://192.168.31.47:5002';
 
   const pickVideo = async () => {
     try {
@@ -122,7 +133,26 @@ export default function UnusualDetectionScreen() {
       }
 
       const data: ApiResponse = await response.json();
-      console.log('📊 Analysis Results:', data.results);
+      console.log('📊 Analysis Results:', data);
+      
+      // Check for API errors
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+      
+      if (!data.success) {
+        setError('Analysis failed - server returned unsuccessful response');
+        return;
+      }
+      
+      // Set analysis statistics
+      if (data.total_frames !== undefined && data.threats_detected !== undefined) {
+        setAnalysisStats({
+          totalFrames: data.total_frames,
+          threatsDetected: data.threats_detected
+        });
+      }
       
       // Debug: Check for images in results
       data.results?.forEach((result, index) => {
@@ -131,6 +161,18 @@ export default function UnusualDetectionScreen() {
         }
         if (result.person_images && result.person_images.length > 0) {
           console.log(`👤 Frame ${result.frame} has ${result.person_images.length} person images`);
+        }
+        
+        // Log new detection types
+        const analysis = result.analysis;
+        if (analysis.fighting_detected) {
+          console.log(`🥊 Frame ${result.frame}: Fighting detected`);
+        }
+        if (analysis.fire_detected) {
+          console.log(`🔥 Frame ${result.frame}: Fire detected`);
+        }
+        if (analysis.suspicious_activity) {
+          console.log(`⚠️ Frame ${result.frame}: Suspicious activity detected`);
         }
       });
       
@@ -166,23 +208,24 @@ export default function UnusualDetectionScreen() {
     setSelectedFile(null);
     setSelectedFileUri(null);
     setError(null);
+    setAnalysisStats(null);
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'critical': 
-      case 'danger': return '#ff4444';
-      case 'anomaly': return '#ff8800';
-      case 'error': return '#666666';
+      case 'critical': return '#8B0000'; // Dark red for critical
+      case 'danger': return '#ff4444';   // Red for danger
+      case 'anomaly': return '#ff8800';  // Orange for anomaly
+      case 'error': return '#666666';    // Gray for error
       case 'normal': 
       case 'safe':
-      default: return '#00aa00';
+      default: return '#00aa00';         // Green for safe
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'critical': 
+      case 'critical': return 'flame';
       case 'danger': return 'warning';
       case 'anomaly': return 'alert-circle';
       case 'error': return 'close-circle';
@@ -281,6 +324,25 @@ export default function UnusualDetectionScreen() {
         </View>
       )}
 
+        {/* Analysis Statistics */}
+        {analysisStats && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Analysis Summary</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statCard}>
+                <Ionicons name="videocam" size={20} color="#FF8C00" />
+                <Text style={styles.statValue}>{analysisStats.totalFrames}</Text>
+                <Text style={styles.statLabel}>Total Frames</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Ionicons name="warning" size={20} color="#F44336" />
+                <Text style={styles.statValue}>{analysisStats.threatsDetected}</Text>
+                <Text style={styles.statLabel}>Threats Detected</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
         {/* Results Section */}
         {analysisResults.length > 0 && (
           <View style={styles.section}>
@@ -324,6 +386,28 @@ export default function UnusualDetectionScreen() {
                       {analysis.summary}
                     </Text>
                   )}
+
+                  {/* Detection Type Indicators */}
+                  <View style={styles.detectionTypesContainer}>
+                    {analysis.fighting_detected && (
+                      <View style={styles.detectionTag}>
+                        <Ionicons name="fitness" size={12} color="#FF6B35" />
+                        <Text style={styles.detectionText}>Fighting</Text>
+                      </View>
+                    )}
+                    {analysis.fire_detected && (
+                      <View style={styles.detectionTag}>
+                        <Ionicons name="flame" size={12} color="#FF4444" />
+                        <Text style={styles.detectionText}>Fire</Text>
+                      </View>
+                    )}
+                    {analysis.suspicious_activity && (
+                      <View style={styles.detectionTag}>
+                        <Ionicons name="eye" size={12} color="#FF8800" />
+                        <Text style={styles.detectionText}>Suspicious</Text>
+                      </View>
+                    )}
+                  </View>
                   
                   {analysis.weapons && analysis.weapons.length > 0 && (
                     <View style={styles.weaponsContainer}>
@@ -339,22 +423,112 @@ export default function UnusualDetectionScreen() {
                     </View>
                   )}
 
-                  {/* Frame Screenshot Display */}
+                  {/* Frame Screenshot Display - Show when any threat is detected */}
                   {result.frame_screenshot && (
+                    analysis.weapons.length > 0 || 
+                    analysis.status === 'danger' || 
+                    analysis.status === 'critical' ||
+                    analysis.fighting_detected ||
+                    analysis.fire_detected ||
+                    analysis.suspicious_activity
+                  ) && (
                     <View style={styles.imageContainer}>
-                      <Text style={styles.imageLabel}>📸 Frame Screenshot</Text>
+                      <View style={styles.screenshotHeader}>
+                        <Text style={styles.imageLabel}>📸 Threat Detection Screenshot</Text>
+                        <View style={styles.frameInfo}>
+                          <Ionicons name="videocam" size={14} color="#FF8C00" />
+                          <Text style={styles.frameNumber}>Frame #{result.frame}</Text>
+                        </View>
+                      </View>
                       <View style={styles.screenshotContainer}>
                         <Image 
                           source={{ uri: result.frame_screenshot }} 
                           style={styles.frameScreenshot}
                           resizeMode="cover"
-                          onLoad={() => console.log('✅ Frame screenshot loaded successfully')}
-                          onError={(error) => console.log('❌ Frame screenshot failed to load:', error)}
+                          onLoad={() => console.log('✅ Threat screenshot loaded successfully')}
+                          onError={(error) => console.log('❌ Threat screenshot failed to load:', error)}
                         />
-                        <View style={styles.screenshotOverlay}>
-                          <Ionicons name="camera" size={16} color="#FFFFFF" />
-                          <Text style={styles.screenshotText}>Weapon Detected</Text>
+                        <View style={[styles.screenshotOverlay, { 
+                          backgroundColor: analysis.status === 'critical' ? 'rgba(139, 0, 0, 0.9)' : 
+                                         analysis.status === 'danger' ? 'rgba(255, 68, 68, 0.9)' : 
+                                         analysis.fire_detected ? 'rgba(255, 68, 68, 0.9)' :
+                                         analysis.fighting_detected ? 'rgba(255, 107, 53, 0.9)' :
+                                         'rgba(255, 140, 0, 0.9)' 
+                        }]}>
+                          <Ionicons 
+                            name={analysis.status === 'critical' ? 'flame' : 
+                                  analysis.fire_detected ? 'flame' :
+                                  analysis.fighting_detected ? 'fitness' :
+                                  analysis.status === 'danger' ? 'warning' : 'shield'} 
+                            size={16} 
+                            color="#FFFFFF" 
+                          />
+                          <Text style={styles.screenshotText}>
+                            {analysis.status === 'critical' ? 'CRITICAL THREAT' :
+                             analysis.fire_detected ? 'FIRE DETECTED' :
+                             analysis.fighting_detected ? 'FIGHTING DETECTED' :
+                             analysis.status === 'danger' ? 'DANGER DETECTED' :
+                             analysis.weapons.length > 0 ? 'WEAPON DETECTED' : 'THREAT DETECTED'}
+                          </Text>
                         </View>
+                        <View style={styles.screenshotTimestamp}>
+                          <Ionicons name="time" size={12} color="#FFFFFF" />
+                          <Text style={styles.screenshotTimestampText}>
+                            {Math.floor(result.timestamp_sec / 60)}:{(result.timestamp_sec % 60).toFixed(0).padStart(2, '0')}
+                          </Text>
+                        </View>
+                        <View style={styles.screenshotFrameInfo}>
+                          <Ionicons name="information-circle" size={12} color="#FFFFFF" />
+                          <Text style={styles.screenshotFrameInfoText}>
+                            Frame {result.frame} • {result.timestamp_sec.toFixed(1)}s
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.screenshotDetails}>
+                        <View style={styles.detailRow}>
+                          <Ionicons name="calendar" size={14} color="#64748B" />
+                          <Text style={styles.detailText}>
+                            Detected at: {new Date().toLocaleString()}
+                          </Text>
+                        </View>
+                        <View style={styles.detailRow}>
+                          <Ionicons name="stopwatch" size={14} color="#64748B" />
+                          <Text style={styles.detailText}>
+                            Video Time: {Math.floor(result.timestamp_sec / 60)}:{(result.timestamp_sec % 60).toFixed(0).padStart(2, '0')}
+                          </Text>
+                        </View>
+                        {analysis.weapons.length > 0 && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="warning" size={14} color="#F44336" />
+                            <Text style={[styles.detailText, { color: '#F44336' }]}>
+                              Weapons: {analysis.weapons.join(', ')}
+                            </Text>
+                          </View>
+                        )}
+                        {analysis.fighting_detected && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="fitness" size={14} color="#FF6B35" />
+                            <Text style={[styles.detailText, { color: '#FF6B35' }]}>
+                              Physical altercation detected
+                            </Text>
+                          </View>
+                        )}
+                        {analysis.fire_detected && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="flame" size={14} color="#FF4444" />
+                            <Text style={[styles.detailText, { color: '#FF4444' }]}>
+                              Fire or smoke detected
+                            </Text>
+                          </View>
+                        )}
+                        {analysis.suspicious_activity && (
+                          <View style={styles.detailRow}>
+                            <Ionicons name="eye" size={14} color="#FF8800" />
+                            <Text style={[styles.detailText, { color: '#FF8800' }]}>
+                              Suspicious behavior detected
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
                   )}
@@ -382,7 +556,12 @@ export default function UnusualDetectionScreen() {
                         ))}
                       </ScrollView>
                     </View>
-                  ) : result.frame_screenshot && analysis.weapons && analysis.weapons.length > 0 ? (
+                  ) : result.frame_screenshot && (
+                    analysis.weapons && analysis.weapons.length > 0 ||
+                    analysis.fighting_detected ||
+                    analysis.status === 'danger' ||
+                    analysis.status === 'critical'
+                  ) ? (
                     <View style={styles.noPersonsContainer}>
                       <Text style={styles.noPersonsText}>
                         ℹ️ No persons detected in this frame - weapon detection only
@@ -777,22 +956,54 @@ const styles = StyleSheet.create({
   imageContainer: {
     marginTop: 16,
     marginBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  screenshotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   imageLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#F44336',
+    flex: 1,
+  },
+  frameInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF4E6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFD4A3',
+  },
+  frameNumber: {
+    fontSize: 12,
+    fontWeight: '600',
     color: '#FF8C00',
-    marginBottom: 8,
+    marginLeft: 4,
   },
   screenshotContainer: {
     position: 'relative',
     borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: '#FF4444',
   },
   frameScreenshot: {
     width: '100%',
@@ -815,6 +1026,59 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  screenshotTimestamp: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  screenshotTimestampText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  screenshotFrameInfo: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  screenshotFrameInfoText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  screenshotDetails: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  detailText: {
+    fontSize: 13,
+    color: '#64748B',
+    marginLeft: 8,
+    fontWeight: '500',
   },
   personsContainer: {
     marginTop: 16,
@@ -867,5 +1131,58 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontStyle: 'italic',
     textAlign: 'center',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 12,
+  },
+  statCard: {
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 12,
+    flex: 1,
+    marginHorizontal: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  detectionTypesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    marginBottom: 8,
+    gap: 6,
+  },
+  detectionTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FFD4A3',
+    gap: 4,
+  },
+  detectionText: {
+    fontSize: 11,
+    color: '#FF6B35',
+    fontWeight: '600',
   },
 });

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { auth, db } from '../../lib/firebase';
 
 const { width } = Dimensions.get('window');
@@ -64,7 +64,8 @@ export default function MedicalAdminProfile() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
         </View>
@@ -72,12 +73,13 @@ export default function MedicalAdminProfile() {
           <ActivityIndicator size="large" color="#20B2AA" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -233,7 +235,7 @@ export default function MedicalAdminProfile() {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -255,20 +257,22 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    marginBottom: 20,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   headerContent: {
     flexDirection: 'row',
@@ -279,31 +283,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#7F8C8D',
+    fontSize: 14,
+    color: '#64748B',
     fontWeight: '500',
+    letterSpacing: 0.2,
   },
   statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: '#20B2AA',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    shadowColor: '#10B981',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   statusDot: {
     width: 8,
@@ -313,98 +319,123 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   profileCard: {
-    backgroundColor: '#20B2AA',
-    borderRadius: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#20B2AA',
+    marginBottom: 16,
+    shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#20B2AA',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
     borderWidth: 3,
     borderColor: '#FFFFFF',
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
+    backgroundColor: '#20B2AA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+    shadowColor: '#20B2AA',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   roleText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: 6,
     textAlign: 'center',
+    letterSpacing: -0.2,
   },
   userEmail: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 20,
+    fontSize: 14,
+    color: '#7F8C8D',
+    marginBottom: 16,
     textAlign: 'center',
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
   profileStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: '#F0F8FF',
+    padding: 12,
+    borderRadius: 12,
   },
   statItem: {
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2C3E50',
+    marginBottom: 2,
+    letterSpacing: -0.1,
   },
   statLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
+    fontSize: 11,
+    color: '#7F8C8D',
+    fontWeight: '500',
+    letterSpacing: 0.2,
   },
   infoSection: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 24,
+    marginBottom: 16,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
@@ -417,7 +448,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -460,9 +491,9 @@ const styles = StyleSheet.create({
   },
   featuresSection: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 24,
+    marginBottom: 16,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
@@ -476,9 +507,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 4,
   },
   featureCard: {
-    width: (width - 60) / 3,
+    width: (width - 40) / 3,
     backgroundColor: '#F0F8FF',
     padding: 16,
     borderRadius: 16,
@@ -507,19 +539,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   actionsSection: {
-    marginBottom: 30,
+    marginBottom: 24,
   },
   actionsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 12,
   },
   actionCard: {
     flex: 1,
     backgroundColor: '#FFFFFF',
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: 'center',
-    marginHorizontal: 6,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,

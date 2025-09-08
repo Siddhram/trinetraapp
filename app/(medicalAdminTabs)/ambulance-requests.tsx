@@ -1,16 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Linking,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import FirebaseService, { AmbulanceRequest } from '../../lib/firebaseService';
 
@@ -64,6 +67,34 @@ export default function MedicalAdminAmbulanceRequests() {
     setRefreshing(true);
     await loadRequests();
     setRefreshing(false);
+  };
+
+  const handleCallPatient = (phoneNumber: string, patientName: string) => {
+    Alert.alert(
+      'Call Patient',
+      `Call ${patientName} at ${phoneNumber}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Call',
+          onPress: () => {
+            const phoneUrl = `tel:${phoneNumber}`;
+            Linking.canOpenURL(phoneUrl)
+              .then((supported) => {
+                if (supported) {
+                  Linking.openURL(phoneUrl);
+                } else {
+                  Alert.alert('Error', 'Phone calls are not supported on this device');
+                }
+              })
+              .catch((error) => {
+                console.error('Error opening phone app:', error);
+                Alert.alert('Error', 'Failed to open phone app');
+              });
+          }
+        }
+      ]
+    );
   };
 
   const handleAcceptRequest = async (request: AmbulanceRequest) => {
@@ -168,18 +199,26 @@ export default function MedicalAdminAmbulanceRequests() {
           <Text style={styles.patientName}>{item.patientName}</Text>
           <Text style={styles.patientPhone}>{item.patientPhone}</Text>
         </View>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: getStatusColor(item.status) }
-        ]}>
-          <Ionicons 
-            name={getStatusIcon(item.status)} 
-            size={14} 
-            color="white" 
-          />
-          <Text style={styles.statusText}>
-            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-          </Text>
+        <View style={styles.patientActions}>
+          <TouchableOpacity
+            style={styles.callButton}
+            onPress={() => handleCallPatient(item.patientPhone, item.patientName)}
+          >
+            <Ionicons name="call" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: getStatusColor(item.status) }
+          ]}>
+            <Ionicons 
+              name={getStatusIcon(item.status)} 
+              size={14} 
+              color="white" 
+            />
+            <Text style={styles.statusText}>
+              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -196,10 +235,42 @@ export default function MedicalAdminAmbulanceRequests() {
 
       {/* Location Info */}
       <View style={styles.locationSection}>
-        <Ionicons name="location" size={16} color="#20B2AA" />
-        <Text style={styles.locationText}>
-          {item.patientAddress || `${item.latitude ? item.latitude.toFixed(4) : '0.0000'}, ${item.longitude ? item.longitude.toFixed(4) : '0.0000'}`}
-        </Text>
+        <View style={styles.locationInfo}>
+          <Ionicons name="location" size={16} color="#20B2AA" />
+          <View style={styles.locationDetails}>
+            <Text style={styles.locationLabel}>Patient Location</Text>
+            <Text style={styles.locationText}>
+              {item.patientAddress || `${item.latitude ? item.latitude.toFixed(4) : '0.0000'}, ${item.longitude ? item.longitude.toFixed(4) : '0.0000'}`}
+            </Text>
+            {item.latitude && item.longitude && (
+              <Text style={styles.coordinatesText}>
+                📍 {item.latitude.toFixed(6)}, {item.longitude.toFixed(6)}
+              </Text>
+            )}
+          </View>
+        </View>
+        {item.latitude && item.longitude && (
+          <TouchableOpacity
+            style={styles.mapButton}
+            onPress={() => {
+              const mapUrl = `https://www.google.com/maps?q=${item.latitude},${item.longitude}`;
+              Linking.canOpenURL(mapUrl)
+                .then((supported) => {
+                  if (supported) {
+                    Linking.openURL(mapUrl);
+                  } else {
+                    Alert.alert('Error', 'Maps app is not available on this device');
+                  }
+                })
+                .catch((error) => {
+                  console.error('Error opening maps:', error);
+                  Alert.alert('Error', 'Failed to open maps');
+                });
+            }}
+          >
+            <Ionicons name="map" size={16} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Hospital Info (if accepted) */}
@@ -262,9 +333,16 @@ export default function MedicalAdminAmbulanceRequests() {
         </View>
         
         <View style={styles.timestamp}>
-          <Ionicons name="time" size={12} color="#7F8C8D" />
+          <Ionicons name="time" size={12} color="#64748B" />
           <Text style={styles.timestampText}>
-            {item.createdAt?.toDate?.()?.toLocaleString() || 'Just now'}
+            {item.createdAt?.toDate?.() ? 
+              item.createdAt.toDate().toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              }) : 'Just now'}
           </Text>
         </View>
       </View>
@@ -273,7 +351,8 @@ export default function MedicalAdminAmbulanceRequests() {
 
   if (loading) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Ambulance Requests</Text>
         </View>
@@ -281,12 +360,13 @@ export default function MedicalAdminAmbulanceRequests() {
           <ActivityIndicator size="large" color="#20B2AA" />
           <Text style={styles.loadingText}>Loading ambulance requests...</Text>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -352,7 +432,7 @@ export default function MedicalAdminAmbulanceRequests() {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -363,20 +443,22 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-    marginBottom: 20,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   headerContent: {
     flexDirection: 'row',
@@ -387,31 +469,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#7F8C8D',
+    fontSize: 14,
+    color: '#64748B',
     fontWeight: '500',
+    letterSpacing: 0.2,
   },
   statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#20B2AA',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    shadowColor: '#20B2AA',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    shadowColor: '#10B981',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   statusDot: {
     width: 8,
@@ -421,52 +505,60 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '600',
     color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   filterContainer: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    marginBottom: 20,
+    paddingVertical: 12,
+    marginHorizontal: 0,
+    borderRadius: 0,
+    marginBottom: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   filterScroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
   },
   filterButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-    marginRight: 12,
-    backgroundColor: '#F0F8FF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E8F4FD',
+    borderColor: '#E2E8F0',
+    minWidth: 80,
+    alignItems: 'center',
   },
   filterButtonActive: {
-    backgroundColor: '#20B2AA',
-    borderColor: '#20B2AA',
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
   },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#7F8C8D',
+    color: '#64748B',
+    letterSpacing: 0.2,
   },
   filterButtonTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   loadingContainer: {
     flex: 1,
@@ -507,31 +599,44 @@ const styles = StyleSheet.create({
   },
   requestCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   patientHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   patientAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#20B2AA',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    shadowColor: '#10B981',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   patientInitial: {
     fontSize: 18,
@@ -541,26 +646,61 @@ const styles = StyleSheet.create({
   patientInfo: {
     flex: 1,
   },
+  patientActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  callButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   patientName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2C3E50',
-    marginBottom: 2,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 4,
+    letterSpacing: -0.2,
   },
   patientPhone: {
-    fontSize: 14,
-    color: '#7F8C8D',
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    letterSpacing: 0.1,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 16,
     gap: 4,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   emergencySection: {
     marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   emergencyHeader: {
     flexDirection: 'row',
@@ -568,37 +708,81 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   emergencyTypeText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#E74C3C',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#DC2626',
     marginLeft: 8,
+    letterSpacing: -0.1,
   },
   description: {
-    fontSize: 14,
-    color: '#7F8C8D',
+    fontSize: 13,
+    color: '#64748B',
     fontStyle: 'italic',
-    lineHeight: 20,
+    lineHeight: 18,
+    letterSpacing: 0.1,
   },
   locationSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#F8FAFC',
     borderRadius: 12,
   },
-  locationText: {
-    fontSize: 14,
-    color: '#2C3E50',
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  locationDetails: {
     marginLeft: 8,
     flex: 1,
   },
+  locationLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  locationText: {
+    fontSize: 13,
+    color: '#1E293B',
+    fontWeight: '500',
+    letterSpacing: 0.1,
+    marginBottom: 2,
+  },
+  coordinatesText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '400',
+    letterSpacing: 0.1,
+  },
+  mapButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   hospitalSection: {
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#F0FDF4',
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 12,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
   },
   hospitalHeader: {
     flexDirection: 'row',
@@ -642,40 +826,47 @@ const styles = StyleSheet.create({
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 25,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     gap: 6,
     shadowColor: '#000000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 2,
   },
   acceptButton: {
-    backgroundColor: '#20B2AA',
+    backgroundColor: '#10B981',
   },
   completeButton: {
-    backgroundColor: '#32CD32',
+    backgroundColor: '#059669',
   },
   cancelButton: {
-    backgroundColor: '#E74C3C',
+    backgroundColor: '#DC2626',
   },
   actionButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   timestamp: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
   timestampText: {
     fontSize: 12,
-    color: '#7F8C8D',
+    color: '#64748B',
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
 });

@@ -15,19 +15,21 @@ export default function AdminTabLayout() {
         }),
       }}>
       <Tabs.Screen 
-        name="home" 
+        name="index" 
         options={{ 
           title: 'Home',
           tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
         }} 
       />
-      <Tabs.Screen 
-        name="index" 
+          <Tabs.Screen 
+        name="home" 
         options={{ 
           title: 'CCTV',
           tabBarIcon: ({ color }) => <Ionicons name="videocam" size={24} color={color} />,
         }} 
       />
+     
+    
       <Tabs.Screen 
         name="alerts" 
         options={{ 

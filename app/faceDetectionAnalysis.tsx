@@ -507,6 +507,9 @@ export default function FaceDetectionAnalysisScreen() {
                 </Text>
               </View>
             </TouchableOpacity>
+            
+            {/* Bottom Spacing */}
+            <View style={styles.bottomSpacing} />
           </View>
         ) : (
           <View style={styles.resultContainer}>
@@ -1013,7 +1016,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF8C00',
     borderRadius: 16,
     paddingVertical: 16,
-    marginTop: 8,
+    marginTop: 5,
+    marginBottom: 20,
     shadowColor: '#FF8C00',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
@@ -1379,5 +1383,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  bottomSpacing: {
+    height: 60,
   },
 });
