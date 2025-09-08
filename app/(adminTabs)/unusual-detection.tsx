@@ -60,7 +60,7 @@ export default function UnusualDetectionScreen() {
   // Backend API URL - Update this to match your server
   // For local development: 'http://localhost:5002'
   // For production: 'https://your-domain.com'
-  const API_BASE_URL = 'http://192.168.31.47:5002';
+  const API_BASE_URL = 'https://gun-detection.onrender.com';
 
   const pickVideo = async () => {
     try {
