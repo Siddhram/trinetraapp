@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Modal,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -49,6 +50,9 @@ export default function FaceDetectionAnalysisScreen() {
   const [downloadProgress, setDownloadProgress] = useState<string>('');
   const [tolerance, setTolerance] = useState('0.6');
   const [frameSkip, setFrameSkip] = useState('5');
+  const [showHorizontalVideo, setShowHorizontalVideo] = useState(false);
+  const [horizontalVideoUri, setHorizontalVideoUri] = useState<string | null>(null);
+  const [horizontalVideoFilename, setHorizontalVideoFilename] = useState<string>('');
   const router = useRouter();
 
   useEffect(() => {
@@ -142,7 +146,7 @@ export default function FaceDetectionAnalysisScreen() {
       console.log('Sending request to face detection API...');
       
       // Use the same server for both analysis and download
-      const response = await fetch('http://172.20.10.4:5003/api/detect', {
+      const response = await fetch('http://192.168.31.229:5001/api/detect', {
         method: 'POST',
         body: formData,
         headers: {
@@ -229,7 +233,7 @@ export default function FaceDetectionAnalysisScreen() {
   const downloadFileWithRetry = async (filename: string, fileType: 'video' | 'image', maxRetries: number = 3): Promise<string | null> => {
     const servers = [
       // Cloud server
-      'http://172.20.10.4:5003', // Local server fallback
+      'http://192.168.31.229:5001', // Local server fallback
     ];
     
     for (const server of servers) {
@@ -337,6 +341,18 @@ export default function FaceDetectionAnalysisScreen() {
     setCrowdVideo(null);
     setResult(null);
     setDownloadedFiles([]);
+  };
+
+  const openHorizontalVideo = (videoUri: string, filename: string) => {
+    setHorizontalVideoUri(videoUri);
+    setHorizontalVideoFilename(filename);
+    setShowHorizontalVideo(true);
+  };
+
+  const closeHorizontalVideo = () => {
+    setShowHorizontalVideo(false);
+    setHorizontalVideoUri(null);
+    setHorizontalVideoFilename('');
   };
 
   return (
@@ -624,19 +640,33 @@ export default function FaceDetectionAnalysisScreen() {
                           </View>
                         </View>
                         
-                        <View style={styles.filePreviewContainer}>
+                        <TouchableOpacity 
+                          style={styles.filePreviewContainer}
+                          onPress={() => {
+                            if (file.type === 'video') {
+                              openHorizontalVideo(file.uri, file.filename);
+                            }
+                          }}
+                          activeOpacity={file.type === 'video' ? 0.7 : 1}
+                        >
                           {file.type === 'image' ? (
                             <Image source={{ uri: file.uri }} style={styles.filePreview} />
                           ) : (
-                            <Video
-                              source={{ uri: file.uri }}
-                              style={styles.filePreview}
-                              useNativeControls
-                              resizeMode={ResizeMode.COVER}
-                              shouldPlay={false}
-                            />
+                            <View style={styles.videoContainer}>
+                              <Video
+                                source={{ uri: file.uri }}
+                                style={styles.filePreview}
+                                useNativeControls
+                                resizeMode={ResizeMode.COVER}
+                                shouldPlay={false}
+                              />
+                              <View style={styles.videoClickOverlay}>
+                                <Ionicons name="expand" size={24} color="#FFFFFF" />
+                                <Text style={styles.videoOverlayText}>Tap to view horizontally</Text>
+                              </View>
+                            </View>
                           )}
-                        </View>
+                        </TouchableOpacity>
                         
                         <TouchableOpacity
                           style={styles.viewButton}
@@ -717,10 +747,46 @@ export default function FaceDetectionAnalysisScreen() {
             </View>
           </View>
         )}
-      </ScrollView>
-    </View>
-  );
-}
+        </ScrollView>
+
+        {/* Horizontal Video Modal */}
+        <Modal
+          visible={showHorizontalVideo}
+          animationType="slide"
+          supportedOrientations={['landscape']}
+          onRequestClose={closeHorizontalVideo}
+        >
+          <View style={styles.horizontalVideoContainer}>
+            <View style={styles.horizontalVideoHeader}>
+              <Text style={styles.horizontalVideoTitle}>{horizontalVideoFilename}</Text>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={closeHorizontalVideo}
+              >
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            
+            {horizontalVideoUri && (
+              <Video
+                source={{ uri: horizontalVideoUri }}
+                style={styles.horizontalVideo}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay={false}
+              />
+            )}
+            
+            <View style={styles.horizontalVideoFooter}>
+              <Text style={styles.horizontalVideoInstructions}>
+                Rotate device to landscape for best viewing experience
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    );
+  }
 
 const styles = StyleSheet.create({
   container: {
@@ -1386,5 +1452,75 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 60,
+  },
+  // Horizontal Video Modal Styles
+  horizontalVideoContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  horizontalVideoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  horizontalVideoTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+    marginRight: 20,
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  horizontalVideo: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  horizontalVideoFooter: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderTopWidth: 1,
+    borderTopColor: '#333333',
+    alignItems: 'center',
+  },
+  horizontalVideoInstructions: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  // Video Container and Overlay Styles
+  videoContainer: {
+    position: 'relative',
+  },
+  videoClickOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+  },
+  videoOverlayText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });

@@ -10,14 +10,6 @@ export default function CCTVScreen() {
 
   const cctvFeatures = [
     {
-      id: 1,
-      title: "Crowd Detection",
-      description: "Monitor crowd density and detect overcrowding",
-      icon: "people",
-      color: "#4CAF50",
-      route: "/crowdDetection",
-    },
-    {
       id: 2,
       title: "Face Detection Analysis",
       description: "Advanced facial recognition and analysis",
@@ -168,7 +160,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: "#FFFFFF",
-    paddingTop: 50,
+    paddingTop: 45,
     paddingBottom: 24,
     paddingHorizontal: 24,
     borderBottomLeftRadius: 20,

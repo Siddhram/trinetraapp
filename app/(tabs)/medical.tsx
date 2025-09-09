@@ -38,6 +38,12 @@ export default function MedicalScreen() {
     longitude: number;
   } | null>(null);
   const [ambulanceRouteProcessed, setAmbulanceRouteProcessed] = useState(false);
+  
+  // User to hospital route state
+  const [userToHospitalRoute, setUserToHospitalRoute] = useState<{latitude: number, longitude: number}[]>([]);
+  const [showUserToHospitalRoute, setShowUserToHospitalRoute] = useState(false);
+  const [nearestHospital, setNearestHospital] = useState<Hospital | null>(null);
+  const [userToHospitalRouteProcessed, setUserToHospitalRouteProcessed] = useState(false);
 
   useEffect(() => {
     initializeLocation();
@@ -61,6 +67,15 @@ export default function MedicalScreen() {
       setAmbulanceRouteProcessed(true); // Mark as processed
       }
   }, [params.showAmbulanceRoute, params.patientLat, params.patientLng, params.requestId, params.patientName, location]);
+
+  // Handle user to hospital route parameters
+  useEffect(() => {
+    if (params.showUserToHospitalRoute === 'true' && location && hospitals.length > 0 && !userToHospitalRouteProcessed) {
+      calculateUserToHospitalRoute();
+      setActiveTab('map'); // Switch to map view
+      setUserToHospitalRouteProcessed(true); // Mark as processed
+    }
+  }, [params.showUserToHospitalRoute, location, hospitals]);
 
   const initializeLocation = async () => {
     try {
@@ -555,6 +570,97 @@ export default function MedicalScreen() {
     console.log('Ambulance route cleared successfully');
   };
 
+  // Calculate route from user location to nearest hospital
+  const calculateUserToHospitalRoute = async () => {
+    if (!location || hospitals.length === 0) return;
+    
+    try {
+      const startPoint = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude
+      };
+
+      // Find the nearest hospital
+      const nearest = hospitals.reduce((closest, hospital) => {
+        return hospital.distance < closest.distance ? hospital : closest;
+      });
+
+      const endPoint = {
+        latitude: nearest.latitude,
+        longitude: nearest.longitude
+      };
+
+      // Try to get real road route using OpenRouteService API
+      try {
+        const apiKey = '5b3ce3597851110001cf6248a1b8b8b4a1b4b8b8'; // Free OpenRouteService API key
+        const startCoords = `${startPoint.longitude},${startPoint.latitude}`;
+        const endCoords = `${endPoint.longitude},${endPoint.latitude}`;
+        
+        const response = await fetch(
+          `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${startCoords}&end=${endCoords}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.features && data.features.length > 0) {
+            const route = data.features[0];
+            const coordinates = route.geometry.coordinates;
+            
+            // Convert coordinates to latitude/longitude format
+            const routePoints = coordinates.map((coord: number[]) => ({
+              latitude: coord[1],
+              longitude: coord[0]
+            }));
+            
+            setUserToHospitalRoute(routePoints);
+            setNearestHospital(nearest);
+            setShowUserToHospitalRoute(true);
+            
+            const distance = route.properties.summary.distance / 1000;
+            const duration = route.properties.summary.duration / 60;
+            
+            console.log(`Real road route to nearest hospital ${nearest.name}:`, {
+              distance: `${distance.toFixed(2)} km`,
+              duration: `${duration.toFixed(0)} minutes`,
+              points: routePoints.length
+            });
+            
+            return; // Success, exit early
+          }
+        }
+      } catch (apiError) {
+        console.warn(`OpenRouteService API failed for ${nearest.name}, using fallback route:`, apiError);
+      }
+
+      // Fallback to realistic route if API fails
+      const routePoints = createRealisticRoute(startPoint, endPoint);
+      setUserToHospitalRoute(routePoints);
+      setNearestHospital(nearest);
+      setShowUserToHospitalRoute(true);
+      
+      const distance = calculateDistance(startPoint, endPoint);
+      const estimatedTime = Math.round(distance * 2.5);
+      
+      console.log(`Fallback route to nearest hospital ${nearest.name}:`, {
+        distance: `${distance.toFixed(2)} km`,
+        estimatedTime: `${estimatedTime} minutes`,
+        points: routePoints.length
+      });
+    } catch (error) {
+      console.error('Error calculating user to nearest hospital route:', error);
+    }
+  };
+
+  const clearUserToHospitalRoute = () => {
+    console.log('Clearing user to hospital route...');
+    setUserToHospitalRoute([]);
+    setShowUserToHospitalRoute(false);
+    setNearestHospital(null);
+    // Don't reset userToHospitalRouteProcessed to prevent useEffect from re-triggering
+    console.log('User to hospital route cleared successfully');
+  };
+
   const renderHospitalItem = ({ item }: { item: Hospital }) => (
     <TouchableOpacity style={styles.hospitalItem}>
       <View style={styles.hospitalHeader}>
@@ -758,6 +864,18 @@ export default function MedicalScreen() {
               />
             )}
 
+            {/* User to Nearest Hospital Route */}
+            {showUserToHospitalRoute && userToHospitalRoute.length > 0 && (
+              <Polyline
+                coordinates={userToHospitalRoute}
+                strokeColor="#DC2626"
+                strokeWidth={5}
+                lineCap="round"
+                lineJoin="round"
+                tappable={false}
+              />
+            )}
+
             {/* Patient Location Marker */}
             {ambulanceRequest && (
               <Marker
@@ -793,6 +911,12 @@ export default function MedicalScreen() {
                 <Text style={styles.legendText}>Ambulance Route</Text>
               </View>
             )}
+            {showUserToHospitalRoute && nearestHospital && (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: '#DC2626' }]} />
+                <Text style={styles.legendText}>Route to Nearest Hospital: {nearestHospital.name}</Text>
+              </View>
+            )}
           </View>
 
           {/* Clear Route Button */}
@@ -814,6 +938,17 @@ export default function MedicalScreen() {
             >
               <Ionicons name="close-circle" size={20} color="white" />
               <Text style={styles.clearRouteButtonText}>Clear Ambulance Route</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Clear User to Hospital Route Button */}
+          {showUserToHospitalRoute && (
+            <TouchableOpacity
+              style={styles.clearUserToHospitalRouteButton}
+              onPress={clearUserToHospitalRoute}
+            >
+              <Ionicons name="close-circle" size={20} color="white" />
+              <Text style={styles.clearRouteButtonText}>Clear Hospital Route</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -1082,6 +1217,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#28a745',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
+  },
+  clearUserToHospitalRouteButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,

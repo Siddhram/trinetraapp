@@ -324,7 +324,7 @@ export default function AdminHomeScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1E40AF" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       <ScrollView
         style={styles.scrollView}
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: "#FFFFFF",
-    paddingTop: 25,
+    paddingTop: 35,
     paddingBottom: 20, // Increased padding for better spacing
     paddingHorizontal: 24, // Increased horizontal padding
     borderBottomLeftRadius: 0, // Removed rournded corners for cleaner look

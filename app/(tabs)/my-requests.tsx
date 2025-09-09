@@ -97,11 +97,11 @@ export default function MyRequestsScreen() {
         // Don't fail the main operation if notification fails
       }
 
-      // Navigate to the user's medical tab with route parameters
+      // Navigate to the user's medical tab with route parameters to show route from user to nearby hospitals
       router.push({
         pathname: "/(tabs)/medical",
         params: {
-          showAmbulanceRoute: "true",
+          showUserToHospitalRoute: "true",
           requestId: request.id,
           patientLat: request.latitude?.toString(),
           patientLng: request.longitude?.toString(),

@@ -61,7 +61,7 @@ export default function UnusualDetectionScreen() {
   // For local development: 'http://localhost:5002'
   // For production: 'https://your-domain.com'
   const API_BASE_URL = 'https://gun-detection.onrender.com';
-
+     
   const pickVideo = async () => {
     try {
       // Request permissions
@@ -603,7 +603,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 50,
+    paddingTop: 45,
     paddingBottom: 20,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 24,

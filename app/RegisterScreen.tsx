@@ -321,7 +321,6 @@ export default function RegisterScreen() {
                 <Picker.Item label="User" value="user" />
                 <Picker.Item label="Admin" value="admin" />
                 <Picker.Item label="Medical Admin" value="medicalAdmin" />
-                <Picker.Item label="Global Admin" value="Globaladmin" />
               </Picker>
             </View>
           </View>
@@ -491,6 +490,7 @@ const styles = StyleSheet.create({
   },
   pickerWrapper: {
     paddingVertical: 6,
+    height: 60,
   },
   textInput: {
     flex: 1,
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   },
   picker: {
     flex: 1,
-    height: 44,
+    height: 60,
     color: '#000000',
   },
   registerButton: {

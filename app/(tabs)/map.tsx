@@ -512,31 +512,10 @@ export default function MapScreen() {
         }
       }
 
-      // Only fetch current user and family members
+      // Only fetch family members (current user location is shown via showsUserLocation)
       if (auth.currentUser) {
-        // Add current user
-        try {
-          const currentUserDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-          if (currentUserDoc.exists()) {
-            const currentUserData = currentUserDoc.data();
-            
-            if (currentUserData.location && currentUserData.location.coords) {
-              usersData.push({
-                id: auth.currentUser.uid,
-                coords: currentUserData.location.coords,
-                timestamp: currentUserData.location.timestamp?.toDate?.()?.getTime() || Date.now(),
-                name: 'You',
-                color: '#0000FF', // Blue for current user
-                userData: currentUserData,
-                isOnline: true,
-                lastSeen: 'Now',
-                isFamilyMember: false
-              });
-            }
-          }
-        } catch (error) {
-          console.log('Error getting current user data:', error);
-        }
+        // Skip adding current user as custom marker since showsUserLocation={true} already shows it
+        // This prevents duplicate location markers for the logged-in user
 
         // Add family members
         for (const email of currentUserFamilyMembers) {
@@ -706,7 +685,7 @@ export default function MapScreen() {
                 longitude: location.coords.longitude
               },
               distance: 0,
-              message: `🗺️ He is tracking to you - ${destinationUser.name}`,
+              message: `🗺️ ${currentUserName} is tracking to ${destinationUser.name}`,
               isRead: false
             };
             

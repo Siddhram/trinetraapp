@@ -5,18 +5,18 @@ import { useRouter } from "expo-router"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { useEffect, useState } from "react"
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    SafeAreaView,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native"
 import { auth, db } from "../lib/firebase"
 import FirebaseService from "../lib/firebaseService"
@@ -990,6 +990,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#F9FAFB",
     alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: "#E5E7EB",
   },
@@ -997,6 +998,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontWeight: "700",
     fontSize: 16,
+    textAlign: "center",
   },
   confirmButton: {
     flex: 1,
@@ -1004,6 +1006,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#FF8C00",
     alignItems: "center",
+    justifyContent: "center",
     shadowColor: "#FF8C00",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -1015,5 +1018,6 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 16,
     letterSpacing: 0.3,
+    textAlign: "center",
   },
 })

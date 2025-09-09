@@ -81,7 +81,7 @@ export default function HomeScreen() {
       emoji: "ॐ",
       backgroundColor: "#FF8C00",
       buttonText: "Visit Now",
-      image: "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=400&h=300&fit=crop",
+      image: "https://plus.unsplash.com/premium_photo-1661963629241-52c812d5c7f8?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Nnx8TWFoYWthbGVzaHdhciUyMFRlbXBsZXxlbnwwfHwwfHx8MA%3D%3D",
     },
     {
       id: 2,
@@ -91,7 +91,7 @@ export default function HomeScreen() {
       emoji: "ॐ",
       backgroundColor: "#4ECDC4",
       buttonText: "Explore",
-      image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1609151745346-c624e507baa2?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8QmFkZSUyMEdhbmVzaGppJTIwS2ElMjBNYW5kaXJ8ZW58MHx8MHx8fDA%3D",
     },
     {
       id: 3,
@@ -101,7 +101,7 @@ export default function HomeScreen() {
       emoji: "ॐ",
       backgroundColor: "#9C27B0",
       buttonText: "Darshan",
-      image: "https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1710863805685-73058473ce7e?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8SGFyc2lkZGhpJTIwVGVtcGxlfGVufDB8fDB8fHww",
     },
     {
       id: 4,
@@ -111,7 +111,7 @@ export default function HomeScreen() {
       emoji: "ॐ",
       backgroundColor: "#FF6B6B",
       buttonText: "Seek Blessings",
-      image: "https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1664851451771-2a78ed2b20fe?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8S2FsJTIwQmhhaXJhdiUyMFRlbXBsZXxlbnwwfHwwfHx8MA%3D%3D",
     },
     {
       id: 5,
@@ -121,7 +121,7 @@ export default function HomeScreen() {
       emoji: "ॐ",
       backgroundColor: "#E91E63",
       buttonText: "Worship",
-      image: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop",
+      image: "https://images.unsplash.com/photo-1709308519878-463dc80d5824?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8TWFuZ2FsbmF0aCUyMFRlbXBsZXxlbnwwfHwwfHx8MA%3D%3D",
     },
     {
       id: 6,
@@ -131,7 +131,7 @@ export default function HomeScreen() {
       emoji: "ॐ",
       backgroundColor: "#795548",
       buttonText: "Make Wishes",
-      image: "https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop",
+      image: "https://plus.unsplash.com/premium_photo-1691031429427-97978a028467?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
     },
     
   ]
